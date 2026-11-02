@@ -62,6 +62,14 @@ The device's DSP engine and sequencer are the sealed binary `sdk/lib/libfm1_engi
 - Firmware was 453,076 bytes (845 free) after adding them. Compacted since: each macro is one pointer to `{len, loop, values}` (`CHIP_MACRO`), null when unused, and preset names exist only in host builds (`CHIP_NAME`). That saved 840 bytes: firmware 452,236 bytes, **1,685 free**. Audio of all 25 presets in both flavors is identical before and after (hash 62d6b677...).
 - Next space, if needed: a bit-level factory-bank coder (estimated about 0.5 KB on the current 4.2 KB bank, not measured), or dropping more V15 voices (about 80 bytes each).
 
+## Limiter, echo, presets 25-33, four more Genesis voices (2026-11-02)
+- Soft limiter after the mixer (`CHIP_LIMIT` 24576, quarter slope above it): 8 loud voices no longer clip (peak 27,797, 0 clipped). Single voices (peak about 13.8k) are below the knee and unchanged.
+- Echo (`CHIP_ECHO_LEN` 8192 samples, 16 KB RAM in `chip_t`): CC 91 level (default 0 = off), CC 85 time, CC 86 feedback (capped 198/256). Cleared with volatile stores (no memset in the ISR) on CC 120 and reset; the glue keeps rendering for 24 echo lengths after the last voice.
+- Bug fixed on the way: the DC blocker used `>> 15` on negative values, which rounds down, so it stuck at -99 forever: a small DC offset and the glue never went idle (rendered every block). `mul_shift0` now rounds toward zero in the DC blocker and echo. This changed the determinism hash (now cf2c1406...). CC 120 / reset also zero the DC blocker so its step doesn't sound or echo.
+- Presets 25-33: PSG Kit (square kick and toms), Arp Sus4, Arp Dim, Arp Dom7, Square Bass, Vibrato Lead, Siren, Pickup, Hurt. 34 presets.
+- DX7 bank: GN CLAV, GN HARP, GN STAB, GN BLIP in slots 22-25 (rendered peaks 0.21-0.31); V15 voices now 26-57. Bank 4,396 bytes. NES/GENESIS presets unchanged (slots <= 21).
+- Host tests: 48 checks pass. Firmware 453,276 bytes, **645 free**; heap 220 KB.
+
 ## Constraints learned (don't relearn the hard way)
 - Audio code must be Flash-write safe: tag code `FM1_AUDIO_CODE`, initialized/const tables `FM1_AUDIO_DATA`, and avoid libc/libm and anything that may pull `libcompiler_rt` from Flash. That is why the audio path has no float, no 64-bit math and no variable division (macros step with incremental counters). 64-bit math exists only in init (`build_tables`).
 - Output is 44.1 kHz stereo, signed Q23, 128-frame blocks. The master gain is applied afterwards in `fm1_output_mix`.

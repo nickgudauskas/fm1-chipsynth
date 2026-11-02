@@ -22,6 +22,8 @@
 #define CHIP_MACRO_LEN  32
 #define CHIP_FRAME_HZ   60
 #define CHIP_TBL_N      512
+#define CHIP_ECHO_LEN   8192   /* echo buffer, samples (power of two): about 186 ms */
+#define CHIP_LIMIT      24576  /* soft-limiter knee at int16 scale: above it, 1/4 slope */
 
 typedef enum { CHIP_PULSE = 0, CHIP_TRI, CHIP_WAVE, CHIP_NOISE } chip_wave_t;
 /* NES: 2A03 duties, triangle and nonlinear mixer. SN: Sega Genesis / Master
@@ -108,6 +110,12 @@ typedef struct {
     int32_t x1, y1;          /* DC blocker */
     int32_t pulse_tbl[CHIP_TBL_N], tnd_tbl[CHIP_TBL_N];
     uint32_t inc_tbl[129];   /* phase increment per MIDI note (Q32 cycles/sample) */
+    int echo_level;          /* Q8 wet level, 0 = off (CC 91) */
+    int echo_fb;             /* Q8 feedback, at most about 0.78 (CC 86) */
+    unsigned echo_delay;     /* samples, < CHIP_ECHO_LEN (CC 85) */
+    unsigned echo_pos;
+    int echo_tail;           /* glue: samples left to ring out after the last voice */
+    int16_t echo_buf[CHIP_ECHO_LEN];
 } chip_t;
 
 /* ---- Core (usable standalone, e.g. in host tests) ---------------------- */

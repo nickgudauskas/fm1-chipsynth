@@ -210,7 +210,7 @@ int main(void)
         chip_render_s16(&c, buf, SR / 2);
         long peak = 0; int clipped = 0;
         for (int i = 0; i < SR / 2; i++) { if (abs(buf[i]) > peak) peak = abs(buf[i]); clipped += abs(buf[i]) >= 32767; }
-        printf("INFO  8 loud pulse voices: peak %ld, clipped samples %d (int16 scale, before CHIP_OUT_SHIFT)\n", peak, clipped);
+        CHECK(clipped == 0, "8 loud pulse voices: peak %ld, clipped samples %d (soft limiter)", peak, clipped);
     }
 
     /* 8. Determinism */
@@ -243,10 +243,10 @@ int main(void)
             }
         CHECK(silent == 0 && worst < 32767, "all %d presets sound in NES and SN flavors (peak %ld)", chip_num_presets, worst);
 
-        int kit = -1;
-        for (int p = 0; p < chip_num_presets; p++) if (chip_presets[p].kit) kit = p;
-        CHECK(kit >= 0, "a drum kit preset exists (%s)", kit >= 0 ? chip_presets[kit].name : "none");
-        if (kit >= 0) {
+        int kits = 0;
+        for (int kit = 0; kit < chip_num_presets; kit++) {
+            if (!chip_presets[kit].kit) continue;
+            kits++;
             const struct chip_kit *k = chip_presets[kit].kit;
             int ok = 1;
             for (int key = 24; key < 96; key++) {             /* every key, several octaves */
@@ -258,8 +258,9 @@ int main(void)
                 chip_note_off(&c, key);
                 if (v->gate) ok = 0;                          /* note-off finds the voice by key */
             }
-            CHECK(ok, "kit: each key plays its part at the part's own note, and note-off releases it");
+            CHECK(ok, "kit %s: each key plays its part at the part's own note, and note-off releases it", chip_presets[kit].name);
         }
+        CHECK(kits == 2, "%d drum kit presets", kits);
 
         int major = -1;
         for (int p = 0; p < chip_num_presets; p++) if (!strcmp(chip_presets[p].name, "Arp Major")) major = p;
@@ -275,6 +276,49 @@ int main(void)
         uint32_t lo = seen[0] < seen[1] ? seen[0] : seen[1];
         lo = lo < seen[2] ? lo : seen[2];
         CHECK(major >= 0 && distinct == 3 && lo == c.inc_tbl[60], "Arp Major cycles 3 pitches from the played note");
+    }
+
+    /* 10. Echo: rings after release, off by default, fades at full feedback, CC 120 clears it */
+    {
+        static chip_t c;                      /* static: the echo buffer makes chip_t large */
+        long tail_on = 0, tail_off = 0, late = 0;
+        for (int on = 0; on < 2; on++) {
+            static const chip_inst_t blip = { .name = "t", .wave = CHIP_PULSE, .duty = 2, .sustain = 15 };  /* release 0 = cut */
+            chip_init(&c, SR); chip_set_inst(&c, &blip);
+            if (on) { chip_midi_event(&c, 0xB0 | 85u << 8 | 64u << 16); chip_midi_event(&c, 0xB0 | 91u << 8 | 100u << 16); }
+            chip_note_on(&c, 69, 127);
+            chip_render_s16(&c, buf, SR / 10);
+            chip_note_off(&c, 69);
+            chip_render_s16(&c, buf, SR / 5);          /* release, then 0.1 s later... */
+            chip_render_s16(&c, buf, SR / 2);
+            long pk = 0;
+            for (int i = 0; i < SR / 2; i++) if (abs(buf[i]) > pk) pk = abs(buf[i]);
+            if (on) tail_on = pk; else tail_off = pk;
+        }
+        CHECK(tail_off < 50 && tail_on > 1000, "echo off: silent after release (%ld); echo on: repeats ring (%ld)", tail_off, tail_on);
+        chip_init(&c, SR);
+        chip_midi_event(&c, 0xB0 | 85u << 8 | 127u << 16);
+        chip_midi_event(&c, 0xB0 | 86u << 8 | 127u << 16);
+        chip_midi_event(&c, 0xB0 | 91u << 8 | 127u << 16);
+        CHECK(c.echo_delay < CHIP_ECHO_LEN && c.echo_fb <= 200 && c.echo_level == 254, "echo CCs: delay %u samples, feedback %d/256, level %d/256", c.echo_delay, c.echo_fb, c.echo_level);
+        for (int k = 0; k < 4; k++) chip_note_on(&c, 57 + 4 * k, 127);
+        chip_render_s16(&c, buf, SR / 4);
+        chip_all_off(&c);
+        for (int sec = 0; sec < 6; sec++) chip_render_s16(&c, buf, SR);
+        for (int i = 0; i < SR; i++) if (abs(buf[i]) > late) late = abs(buf[i]);
+        CHECK(late < 100, "full feedback fades: peak %ld after 6 s", late);
+        chip_note_on(&c, 69, 127); chip_render_s16(&c, buf, SR / 4);
+        chip_midi_event(&c, 0xB0 | 120u << 8);
+        chip_render_s16(&c, buf, SR / 2);
+        long after = 0;
+        for (int i = SR / 4; i < SR / 2; i++) if (abs(buf[i]) > after) after = abs(buf[i]);
+        CHECK(after < 50, "CC 120 silences voices and echo (peak %ld)", after);
+        chip_init(&c, SR);
+        chip_note_on(&c, 40, 127); chip_note_on(&c, 52, 127);
+        chip_render_s16(&c, buf, SR / 4);
+        chip_note_off(&c, 40); chip_note_off(&c, 52);
+        chip_render_s16(&c, buf, SR);
+        CHECK(chip_active_voices(&c) == 0 && c.x1 == 0 && c.y1 == 0, "after release the DC blocker settles to 0 (y1 %d), so the glue can go idle", (int)c.y1);
     }
 
     printf(fails ? "\n%d test(s) FAILED\n" : "\nAll tests passed\n", fails);

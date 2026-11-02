@@ -27,6 +27,13 @@ CHIP_MACRO(tremolo_vol, 0, 15, 15, 8, 8);
 CHIP_MACRO(kick_arp, 0xFF, 24, 12, 5, 0, -5, -9, -12);
 CHIP_MACRO(tom_arp, 0xFF, 7, 4, 2, 0, -2, -4, -6);
 CHIP_MACRO(snare_arp, 0xFF, 12, 8, 4, 0);
+CHIP_MACRO(arp_sus4, 0, 0, 5, 7);
+CHIP_MACRO(arp_dim, 0, 0, 3, 6, 9);
+CHIP_MACRO(arp_dom7, 0, 0, 4, 7, 10);
+CHIP_MACRO(siren_arp, 0, 0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1);
+CHIP_MACRO(pickup_arp, 0xFF, 0, 7, 12);
+CHIP_MACRO(hurt_arp, 0xFF, 0, -1, 0, -2, 0, -3, -5, -8);
+CHIP_MACRO(psg_kick_arp, 0xFF, 12, 5, 0, -7, -12, -17, -24);
 static const uint8_t bass_wave[32] FM1_AUDIO_DATA = {
     8, 9, 11, 12, 13, 14, 14, 15, 15, 14, 14, 13, 12, 11, 9, 8,
     7, 6, 4, 3, 2, 1, 1, 0, 0, 1, 1, 2, 3, 4, 6, 7 };
@@ -50,6 +57,16 @@ static const chip_inst_t crash FM1_AUDIO_DATA = { CHIP_NAME("Crash") .wave = CHI
 static const struct chip_kit drum_kit FM1_AUDIO_DATA = {
     .part = { &kick, &clap, &snare, &clap, &snare, &tom, &hat, &tom, &hat, &tom, &open_hat, &crash },
     .note = { 48,    84,    72,     88,    76,     43,   96,   47,   98,   52,   96,        86 },
+};
+
+/* Genesis PSG kit: the SN76489 has no triangle, so kick and toms are squares. */
+static const chip_inst_t psg_kick FM1_AUDIO_DATA = { CHIP_NAME("PSG Kick") .wave = CHIP_PULSE, .duty = 2,
+    .decay_frames = 1, .sustain = 0, .release_frames = 1, .arp = psg_kick_arp };
+static const chip_inst_t psg_tom FM1_AUDIO_DATA = { CHIP_NAME("PSG Tom") .wave = CHIP_PULSE, .duty = 2,
+    .decay_frames = 2, .sustain = 0, .release_frames = 2, .arp = tom_arp };
+static const struct chip_kit psg_kit FM1_AUDIO_DATA = {
+    .part = { &psg_kick, &clap, &snare, &clap, &snare, &psg_tom, &hat, &psg_tom, &hat, &psg_tom, &open_hat, &crash },
+    .note = { 40,        84,    72,     88,    76,     45,       96,   50,       98,   55,       96,        86 },
 };
 
 const chip_inst_t chip_presets[] FM1_AUDIO_DATA = {
@@ -140,6 +157,33 @@ const chip_inst_t chip_presets[] FM1_AUDIO_DATA = {
 
     { CHIP_NAME("Tremolo Lead") .wave = CHIP_PULSE, .duty = 1,
       .sustain = 13, .release_frames = 3, .macro_div = 3, .vol = tremolo_vol },
+
+    /* 25- */
+    { CHIP_NAME("PSG Kit") .kit = &psg_kit },
+
+    { CHIP_NAME("Arp Sus4") .wave = CHIP_PULSE, .duty = 1,
+      .sustain = 11, .release_frames = 2, .arp = arp_sus4 },
+
+    { CHIP_NAME("Arp Dim") .wave = CHIP_PULSE, .duty = 1,
+      .sustain = 11, .release_frames = 2, .arp = arp_dim },
+
+    { CHIP_NAME("Arp Dom7") .wave = CHIP_PULSE, .duty = 2,
+      .sustain = 11, .release_frames = 2, .arp = arp_dom7 },
+
+    { CHIP_NAME("Square Bass") .wave = CHIP_PULSE, .duty = 2,
+      .decay_frames = 3, .sustain = 10, .release_frames = 1 },
+
+    { CHIP_NAME("Vibrato Lead") .wave = CHIP_PULSE, .duty = 1,
+      .sustain = 12, .release_frames = 3, .vib_speed = 64, .vib_depth = 8 },
+
+    { CHIP_NAME("Siren") .wave = CHIP_PULSE, .duty = 2,
+      .sustain = 12, .release_frames = 2, .macro_div = 2, .arp = siren_arp },
+
+    { CHIP_NAME("Pickup") .wave = CHIP_PULSE, .duty = 1,
+      .decay_frames = 4, .sustain = 0, .release_frames = 2, .macro_div = 3, .arp = pickup_arp },
+
+    { CHIP_NAME("Hurt") .wave = CHIP_PULSE, .duty = 0,
+      .decay_frames = 1, .sustain = 0, .release_frames = 1, .arp = hurt_arp },
 };
 
 const int chip_num_presets FM1_AUDIO_DATA = (int)(sizeof chip_presets / sizeof chip_presets[0]);

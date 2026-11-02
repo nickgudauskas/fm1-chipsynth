@@ -121,16 +121,32 @@ const GENESIS=[
   ops:[{out:93,c:0,r:[99,99,99,80],l:[99,99,99,0]},{out:96,r:[99,99,99,80],l:[99,99,99,0]},
    {out:95,c:2,r:[99,99,99,80],l:[99,99,99,0]},{out:90,c:3,r:[99,99,99,80],l:[99,99,99,0]},
    {out:84,c:4,r:[99,99,99,80],l:[99,99,99,0]},{out:88,d:9,r:[99,99,99,80],l:[99,99,99,0]}]}),
+ chipVoice({name:'GN CLAV',   // a 3:1 modulator gives the clavinet's odd-harmonic bite
+  ops:[{out:99,v:3,r:[99,60,45,75],l:[99,70,0,0]},{out:80,c:3,r:[99,70,50,80],l:[99,40,40,0]},
+   {out:99,d:9,v:3,r:[99,60,45,75],l:[99,70,0,0]},{out:75,r:[99,75,50,80],l:[99,30,30,0]},
+   {out:99,d:5,v:3,r:[99,60,45,75],l:[99,70,0,0]},{out:80,c:3,d:5,r:[99,70,50,80],l:[99,40,40,0]}]}),
+ chipVoice({name:'GN HARP',   // plucked: bright attack that settles to a ringing sine
+  ops:[{out:99,v:3,r:[99,40,35,55],l:[99,70,0,0]},{out:60,c:4,r:[99,60,50,70],l:[99,0,0,0]},
+   {out:92,c:2,v:3,r:[99,40,35,55],l:[99,70,0,0]},{out:55,r:[99,60,50,70],l:[99,0,0,0]},
+   {out:99,d:9,v:3,r:[99,40,35,55],l:[99,70,0,0]},{out:60,c:4,d:9,r:[99,60,50,70],l:[99,0,0,0]}]}),
+ chipVoice({name:'GN STAB',fb:5,   // short brass stab
+  ops:[{out:99,v:2,r:[99,55,50,70],l:[99,0,0,0]},{out:85,r:[99,60,50,70],l:[99,70,0,0]},
+   {out:99,d:9,v:2,r:[99,55,50,70],l:[99,0,0,0]},{out:85,d:9,r:[99,60,50,70],l:[99,70,0,0]},
+   {out:97,d:5,v:2,r:[99,55,50,70],l:[99,0,0,0]},{out:82,d:5,r:[99,60,50,70],l:[99,70,0,0]}]}),
+ chipVoice({name:'GN BLIP',fb:5,pr:[99,90,99,99],pl:[56,50,50,50],   // square lead, quick pitch blip
+  ops:[{out:99,v:2,r:[99,55,50,70],l:[99,85,80,0]},{out:77,c:2},
+   {out:99,d:5,v:2,r:[99,55,50,70],l:[99,85,80,0]},{out:77,c:2,d:5},
+   {out:95,d:9,v:2,r:[99,55,50,70],l:[99,85,80,0]},{out:70}]}),
 ];
-// Store only 54 distinct voices but keep 128 valid program numbers: slots
-// 0-9 the NES-style chip voices, 10-21 the Genesis-style voices, 22-53 the
+// Store only 58 distinct voices but keep 128 valid program numbers: slots
+// 0-9 the NES-style chip voices, 10-25 the Genesis-style voices, 26-57 the
 // kept V15 voices (variants 1-2 of the 12 families in original slot order,
 // then 8 one-off sounds), then that sequence repeats. A repeat encodes as a
 // single match of a few bytes.
 const KEEP_MISC=[96,97,104,108,109,113,117,121];
 const kept=[...Array(96).keys()].filter(s=>((s%32)>>2)<2).concat(KEEP_MISC);
 const voices=[...CHIP,...GENESIS,...kept.map(s=>original.subarray(s*128,s*128+128))];
-assert.equal(voices.length,54);
+assert.equal(voices.length,58);
 const raw=new Uint8Array(original.length);
 for(let s=0;s<128;s++)raw.set(voices[s%voices.length],s*128);
 // VMEM literals are seven-bit. A high bit denotes a 3..130-byte match,
@@ -154,10 +170,10 @@ for(let i=0;i<packed.length;){const token=packed[i++];if(token<128)decoded.push(
 assert.deepEqual(Buffer.from(decoded),Buffer.from(raw));
 const lines=[];for(let i=0;i<packed.length;i+=24)lines.push('    '+packed.slice(i,i+24).join(',')+',');
 const content='/* SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only WITH GPL-3.0-linking-exception\n'+
- ' * Slots 0-9: NES-style and 10-21: Sega Genesis-style voices written for FM1\n'+
- ' * Open (GPL-3.0-only, see tools/Generate-Factory-DX7.mjs). Slots 22-53: 32\n'+
+ ' * Slots 0-9: NES-style and 10-25: Sega Genesis-style voices written for FM1\n'+
+ ' * Open (GPL-3.0-only, see tools/Generate-Factory-DX7.mjs). Slots 26-57: 32\n'+
  ' * voices of the M-VAVE V15 factory DX7 bank, modified by selection and\n'+
- ' * reordering; slots 54-127 repeat 0-53. The full V15 bank ships as four DX7\n'+
+ ' * reordering; slots 58-127 repeat 0-57. The full V15 bank ships as four DX7\n'+
  ' * library .syx files.\n'+
  ' * Regenerate: node tools/Generate-Factory-DX7.mjs [--syx DIR]\n'+
  ' * Original VMEM SHA-256: '+sha(original)+'\n'+
@@ -167,4 +183,4 @@ const content='/* SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only WITH GPL-
 const target=new URL('../app/fm_factory.inc',import.meta.url);
 if(process.argv.includes('--check'))assert.equal(fs.readFileSync(target,'utf8'),content);
 else fs.writeFileSync(target,content);
-console.log(`Factory bank: 10 NES + 12 Genesis + 32 V15 voices in 128 slots: ${raw.length} VMEM bytes, ${packed.length} encoded bytes.`);
+console.log(`Factory bank: 10 NES + 16 Genesis + 32 V15 voices in 128 slots: ${raw.length} VMEM bytes, ${packed.length} encoded bytes.`);

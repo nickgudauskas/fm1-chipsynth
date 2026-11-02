@@ -54,6 +54,8 @@ void chip_init(chip_t *c, int sr)
     c->mode = CHIP_MODE_POLY;
     c->num_voices = CHIP_MAX_VOICES;
     c->gain_q8 = 256;
+    c->echo_delay = 64 + 64 * 63;          /* CC 85 = 64: about 93 ms */
+    c->echo_fb = 128;                      /* CC 86 = 82: half */
     c->inst = &chip_presets[0];
     for (int i = 0; i < CHIP_MAX_VOICES; i++) c->v[i].lfsr = 1;
     build_tables(c);
@@ -65,6 +67,18 @@ void chip_set_flavor(chip_t *c, chip_flavor_t f) { c->flavor = f; }
 void chip_set_preset(chip_t *c, unsigned index)
 {
     if (index < (unsigned)chip_num_presets) c->inst = &chip_presets[index];
+}
+
+/* All sound off: empty the echo and reset the DC blocker, whose step back to
+ * zero would otherwise sound (and echo) after the voices are cut. Volatile
+ * stores so the compiler can't turn this into a memset call, which would run
+ * libc code from Flash inside the audio interrupt. */
+static FM1_AUDIO_CODE void echo_clear(chip_t *c)
+{
+    volatile int16_t *b = c->echo_buf;
+    for (unsigned i = 0; i < CHIP_ECHO_LEN; i++) b[i] = 0;
+    c->echo_tail = 0;
+    c->x1 = c->y1 = 0;
 }
 
 FM1_AUDIO_CODE void chip_all_off(chip_t *c)
@@ -302,7 +316,7 @@ FM1_AUDIO_CODE void chip_note_off(chip_t *c, int note)
 FM1_AUDIO_CODE void chip_midi_event(chip_t *c, uint32_t ev)
 {
     unsigned status = ev & 0xffu, d1 = (ev >> 8) & 127u, d2 = (ev >> 16) & 127u;
-    if (status == 0xff) { chip_all_off(c); return; }
+    if (status == 0xff) { chip_all_off(c); echo_clear(c); return; }
     switch (status & 0xf0u) {
     case 0x90: if (d2) chip_note_on(c, (int)d1, (int)d2); else chip_note_off(c, (int)d1); break;
     case 0x80: chip_note_off(c, (int)d1); break;
@@ -314,7 +328,10 @@ FM1_AUDIO_CODE void chip_midi_event(chip_t *c, uint32_t ev)
         case 70:  c->flavor = d2 >= 64u ? CHIP_FLAVOR_SN : CHIP_FLAVOR_NES; break;
         case 71:  chip_set_mode(c, d2 < 43u ? CHIP_MODE_POLY : d2 < 86u ? CHIP_MODE_MONO : CHIP_MODE_CHIP); break;
         case 72:  c->glide_q8 = (int)d2 * 2; break;
-        case 120: chip_all_off(c); break;
+        case 85:  c->echo_delay = 64u + d2 * 63u; break;           /* 1.5 to 184 ms */
+        case 86:  c->echo_fb = (int)(d2 * 25u) >> 4; break;        /* up to 198/256 */
+        case 91:  c->echo_level = (int)d2 * 2; break;
+        case 120: chip_all_off(c); echo_clear(c); break;
         case 123:
             for (int i = 0; i < CHIP_MAX_VOICES; i++)
                 if (c->v[i].active && c->v[i].gate) { c->v[i].gate = 0; c->v[i].env_cnt = 0; }
@@ -325,6 +342,15 @@ FM1_AUDIO_CODE void chip_midi_event(chip_t *c, uint32_t ev)
         break;
     default: break;
     }
+}
+
+/* a * b >> shift, rounded toward zero. A plain arithmetic shift rounds negative
+ * values down, so decaying filter and echo states would stick at -1 or below
+ * instead of reaching zero (and the engine would never go idle). */
+static inline __attribute__((always_inline)) int32_t mul_shift0(int32_t a, int32_t b, int shift)
+{
+    int32_t t = a * b;
+    return t >= 0 ? t >> shift : -((-t) >> shift);
 }
 
 /* One output sample at int16 scale. Always inlined into the render loops so the
@@ -389,10 +415,21 @@ static inline __attribute__((always_inline)) int32_t chip_sample(chip_t *c)
         x = ssum;                                /* the SN76489 sums its outputs linearly */
     }
 
-    int32_t y = x - c->x1 + ((c->y1 * 32440) >> 15);   /* DC blocker, R ~ 0.99 */
+    int32_t y = x - c->x1 + mul_shift0(c->y1, 32440, 15);   /* DC blocker, R ~ 0.99 */
     c->x1 = x;
     c->y1 = y;
     y = (y * c->gain_q8) >> 8;
+    if (c->echo_level) {                     /* NES-style echo: delayed copy with feedback */
+        unsigned w = c->echo_pos;
+        int32_t e = c->echo_buf[(w - c->echo_delay) & (CHIP_ECHO_LEN - 1u)];
+        int32_t in = y + mul_shift0(e, c->echo_fb, 8);
+        c->echo_buf[w & (CHIP_ECHO_LEN - 1u)] = (int16_t)(in > 32767 ? 32767 : in < -32768 ? -32768 : in);
+        c->echo_pos = w + 1u;
+        y += mul_shift0(e, c->echo_level, 8);
+    }
+    /* Soft limiter: stacks of loud voices bend over instead of clipping. */
+    if (y > CHIP_LIMIT) y = CHIP_LIMIT + ((y - CHIP_LIMIT) >> 2);
+    else if (y < -CHIP_LIMIT) y = -CHIP_LIMIT - ((-CHIP_LIMIT - y) >> 2);
     if (y > 32767) y = 32767;
     if (y < -32768) y = -32768;
     return y;
@@ -485,8 +522,11 @@ FM1_AUDIO_CODE void chip_engine_render_add(int32_t *output, unsigned frames)
     chip_t *c = &g_chip;
     if (!output || !c->sr) return;
     drain(c);
-    int busy = c->x1 || c->y1;
-    for (int k = 0; k < CHIP_MAX_VOICES && !busy; k++) busy = c->v[k].active;
+    int busy = c->x1 || c->y1, voices = 0;
+    for (int k = 0; k < CHIP_MAX_VOICES; k++) voices |= c->v[k].active;
+    if (voices) c->echo_tail = 24 * CHIP_ECHO_LEN;  /* 0.78^24 < 1%: the echo has faded */
+    else if (c->echo_tail > 0) c->echo_tail -= (int)frames;
+    busy |= voices || (c->echo_level && c->echo_tail > 0);
     if (!busy) return;                     /* idle: no work and nothing to add */
     chip_render_q23_add(c, output, frames);
 }
