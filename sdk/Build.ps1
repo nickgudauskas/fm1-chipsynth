@@ -227,7 +227,7 @@ function Package-Firmware {
     $generated = Join-Path $build 'generated'
     $elf = Join-Path $build 'sdk.elf'
     $before = Hash $elf
-    $output = Join-Path $generated 'FM1_OFFICIAL_OPEN.fwsc'
+    $output = Join-Path $generated 'Chipwave 01.fwsc'
     $complete = $false
     Push-Location -LiteralPath $generated
     try {
@@ -274,7 +274,7 @@ $oldWeb = Join-Path $official 'FM1-Official-Open-Source.html'
 if (Test-Path -LiteralPath $oldWeb) {
     Write-Text $oldWeb '<!doctype html><meta charset="utf-8"><title>FM1</title><p>Build incomplete. Run build.bat --package successfully before distributing this page.</p>'
 }
-foreach ($name in @('FM1_OFFICIAL_OPEN.fw','FM1_OFFICIAL_OPEN.fwsc')) {
+foreach ($name in @('FM1_OFFICIAL_OPEN.fw','FM1_OFFICIAL_OPEN.fwsc','Chipwave 01.fwsc')) {
     $oldPackage = Join-Path $build "generated/$name"
     if (Test-Path -LiteralPath $oldPackage) { Remove-Item -LiteralPath $oldPackage }
 }
@@ -430,7 +430,7 @@ try {
     if ($FirmwareOnly) { Package-Firmware }
     if ($Package) {
         Package-Firmware
-        $packageFile = Join-Path $build 'generated/FM1_OFFICIAL_OPEN.fwsc'
+        $packageFile = Join-Path $build 'generated/Chipwave 01.fwsc'
         $packageBytes = [IO.File]::ReadAllBytes($packageFile)
         $familyNumber = $variant.update_family
         # Original V15 recovery image, separate from the Open release.

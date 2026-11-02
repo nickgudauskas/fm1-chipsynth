@@ -57,7 +57,7 @@ $env:FM1_PI32_TOOLCHAIN = 'C:\JL\pi32'
 
 For a local firmware build without a distribution source URL, run `./sdk/Build.ps1 -FirmwareOnly -Toolchain 'C:\JL\pi32'`. A moving GitHub `tree/main` page is not a matching source archive for distribution.
 
-The web version builds from the included C sources. Its first build downloads WASI SDK 27; set `FM1_WASI_SDK` to reuse an installation. Outputs are `build/preview/index.html`, `build/dx7/generated/FM1_OFFICIAL_OPEN.fwsc` and `build/official-web/FM1-Official-Open-Source.html`.
+The web version builds from the included C sources. Its first build downloads WASI SDK 27; set `FM1_WASI_SDK` to reuse an installation. Outputs are `build/preview/index.html`, `build/dx7/generated/Chipwave 01.fwsc` and `build/official-web/FM1-Official-Open-Source.html`.
 
 The [per-track tuning API](app/instrument.h) supports custom tuning; a dedicated tuning editor is not included.
 

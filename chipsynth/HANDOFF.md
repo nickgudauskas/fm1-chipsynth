@@ -42,6 +42,7 @@ The device's DSP engine and sequencer are the sealed binary `sdk/lib/libfm1_engi
 
 ## Flashable Workbench (2026-11-02)
 - Repo: github.com/nickgudauskas/fm1-chipsynth (private; `origin`), M-VAVE's original is `upstream`.
+- The firmware file is `build/dx7/generated/Chipwave 01.fwsc` (renamed in `sdk/Build.ps1`, hash updated in `sdk/manifest.json`; the name is only the output path).
 - Firmware display name is **Chipwave**, version **V01** (`app/version.h`; the build requires V plus two or more digits; the update ID `FM-1_8000014` is left alone) (startup screen, HOME header, workbench label "Chipwave firmware"); the engine is still `chipsynth` in code. Changing `sdk/Update.html.in` / `sdk/I18n.js` requires updating their hashes in `sdk/manifest.json`.
 - Build it in the VM from a pushed commit: `sdk\Build.ps1 -Package -Toolchain C:\JL\pi32 -SourceUrl https://github.com/nickgudauskas/fm1-chipsynth/archive/<full commit sha>.tar.gz` (the script only checks the URL format). Output: `build/official-web/FM1-Official-Open-Source.html`, with its SHA-256 in `SHA256SUMS.txt` and the build ID in `build/dx7/build-identity.json`. It embeds our firmware plus the stock V15 recovery image. Rebuild from a new pushed commit whenever `app/` changes, since the page embeds the source link.
 - The source link points at a private repo, so the page is fine for personal flashing but must not be shared until the repo (or a release archive) is public.
