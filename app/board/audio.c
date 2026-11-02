@@ -3,6 +3,7 @@
 #include "fm1_gpio.h"
 #include "fm1_engine_control.h"
 #include "audio_output.h"
+#include "chip_engine.h"
 #include <string.h>
 
 #define DMA_ALIGNED __attribute__((aligned(32)))
@@ -44,6 +45,7 @@ FM1_AUDIO_CODE __attribute__((interrupt(""))) void fm1_audio_irq(void)
         ++statistics.overruns;
         return;
     }
+    chip_engine_render_add(rendered, FM1_BLOCK_FRAMES); /* chip voices join the engine block */
     fm1_output_mix(rendered);
     uint32_t flags = fm1_audio_irq_save();
     if (fm1_audio_half_owned(half) &&
@@ -69,6 +71,7 @@ void fm1_audio_suspend(void)
         for (unsigned half = 0; half < 2; ++half)
             for (unsigned i = 0; i < FM1_BLOCK_WORDS; ++i) transmit[half][i] = 0;
         fm1_output_reset();
+        chip_engine_panic();
         fm1_device_fence();
     }
     fm1_device_irq_restore(flags);
@@ -89,6 +92,7 @@ int fm1_audio_start(void)
     memset(receive, 0, sizeof receive);
     memset(transmit, 0, sizeof transmit);
     fm1_output_reset();
+    chip_engine_init(FM1_SAMPLE_RATE);
     FM1_ALNK_CON0 = 0; FM1_ALNK_CON1 = 0; FM1_ALNK_CON2 = 0; FM1_ALNK_CON3 = 0;
     FM1_AUDIO_PORT_ROUTE &= ~(3U << 6); /* fixed port C route */
     const uint32_t outputs = (1U << 0) | (1U << 1) | (1U << 2) | (1U << 6);
