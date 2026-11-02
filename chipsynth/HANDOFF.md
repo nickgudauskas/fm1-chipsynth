@@ -42,7 +42,8 @@ The device's DSP engine and sequencer are the sealed binary `sdk/lib/libfm1_engi
 
 ## Flashable Workbench (2026-11-02)
 - Repo: github.com/nickgudauskas/fm1-chipsynth (private; `origin`), M-VAVE's original is `upstream`.
-- Built in the VM with `sdk\Build.ps1 -Package -Toolchain C:\JL\pi32 -SourceUrl https://github.com/nickgudauskas/fm1-chipsynth/archive/8a51cca016e67471331944798582017b1a2929fd.tar.gz` (the script only checks the URL format). Output: `build/official-web/FM1-Official-Open-Source.html` (2.5 MB, SHA-256 in `SHA256SUMS.txt`), build ID `35247db9...`. It embeds our firmware plus the stock V15 recovery image.
+- Firmware display name is **Chipwave**, version **V01** (`app/version.h`; the build requires V plus two or more digits; the update ID `FM-1_8000014` is left alone) (startup screen, HOME header, workbench label "Chipwave firmware"); the engine is still `chipsynth` in code. Changing `sdk/Update.html.in` / `sdk/I18n.js` requires updating their hashes in `sdk/manifest.json`.
+- Built in the VM with `sdk\Build.ps1 -Package -Toolchain C:\JL\pi32 -SourceUrl https://github.com/nickgudauskas/fm1-chipsynth/archive/46deb8e945757ade91fe295027d554c22a5e4570.tar.gz` (the script only checks the URL format). Output: `build/official-web/FM1-Official-Open-Source.html` (SHA-256 `840cc215...` in `SHA256SUMS.txt`), build ID `5bc46dda...`. It embeds our firmware plus the stock V15 recovery image. Rebuild with a new commit's archive URL whenever `app/` changes.
 - The source link points at a private repo, so the page is fine for personal flashing but must not be shared until the repo (or a release archive) is public.
 - Local serving: `.claude/launch.json` config `workbench` serves it at http://localhost:8766/FM1-Official-Open-Source.html. Web MIDI needs a secure context; localhost qualifies.
 - Not yet connected to or flashed onto a device.
