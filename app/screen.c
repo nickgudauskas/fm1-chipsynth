@@ -506,7 +506,7 @@ static __attribute__((noinline)) void overview(const struct groove_view v[8])
         cache->title_cache = title;
         paint_fill(0, 32, 240, 13, BACK);
         text(8, 35, project_name, 1, ACCENT, BACK);
-        text(86, 35, "OPEN " FM1_RELEASE_VERSION, 1, DIM, BACK);
+        text(86, 35, "CHIPWAVE", 1, DIM, BACK);
         text(146, 35, step_follow ? "PAGE" : "STEP", 1, DIM, BACK);
         number(178, 35, step_follow ? first + 1 : cursor + 1, 2, 1, TEXT, BACK);
         text(190, 35, step_follow ? "-" : "/", 1, DIM, BACK);
@@ -1340,7 +1340,7 @@ static __attribute__((noinline, cold, minsize)) void boot_draw(void)
     if (cache->title_cache != 0) {
         cache->title_cache = 0;
         text(86, 48, "FM1", 4, TEXT, BACK);
-        text(81, 98, "OFFICIAL OPEN", 1, ACCENT, BACK);
+        text(96, 98, "CHIPWAVE", 1, ACCENT, BACK);
         text((240 - 12 * (sizeof FM1_RELEASE_VERSION - 1)) / 2, 120,
              FM1_RELEASE_VERSION, 2, TEXT, BACK);
         text(102, 208, "M-VAVE", 1, DIM, BACK);

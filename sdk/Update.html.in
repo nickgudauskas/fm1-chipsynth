@@ -473,7 +473,7 @@ button{border-radius:7px;background:#223039;border-color:#3b4b54;color:#d6e3e6;f
   $('connect').addEventListener('click',connectDevice);
   $('force-activate').addEventListener('click',()=>setForceMode(true,true));
   function packageDetails(){
-    FM1I18n.text($('profile'),pkg.kind==='stock'?'原厂 V15（FM-1_015）':'官方 Open 固件');
+    FM1I18n.text($('profile'),pkg.kind==='stock'?'原厂 V15（FM-1_015）':'Chipwave 固件');
     $('firmware-version').textContent=pkg.release_version||'—';
     FM1I18n.text($('version'),pkg.kind==='stock'?'FM-1_015':pkg.build_id.slice(0,16));$('version').title=pkg.kind==='stock'?pkg.sha256:pkg.build_id;
     FM1I18n.text($('size'),(pkg.bytes/1024).toFixed(1)+' KiB');

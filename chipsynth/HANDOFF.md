@@ -40,6 +40,13 @@ The device's DSP engine and sequencer are the sealed binary `sdk/lib/libfm1_engi
 - Checked by rendering through `web/synth` on the Mac: peaks 0.30-0.36 vs PIANO 1 0.29, pitches on note, noise voices 4.8-9.6k zero crossings/s. Rendered audio in `build/dx7-chip-voices.wav`. All 128 voices pass `FM1Web.validateVoice`. Not yet heard by a person.
 - Firmware: 450,884 bytes, 3,037 free. Bank encodes to 3,754 bytes. `.inc` SPDX is now `Apache-2.0 AND GPL-3.0-only WITH GPL-3.0-linking-exception`.
 
+## Flashable Workbench (2026-11-02)
+- Repo: github.com/nickgudauskas/fm1-chipsynth (private; `origin`), M-VAVE's original is `upstream`.
+- Built in the VM with `sdk\Build.ps1 -Package -Toolchain C:\JL\pi32 -SourceUrl https://github.com/nickgudauskas/fm1-chipsynth/archive/8a51cca016e67471331944798582017b1a2929fd.tar.gz` (the script only checks the URL format). Output: `build/official-web/FM1-Official-Open-Source.html` (2.5 MB, SHA-256 in `SHA256SUMS.txt`), build ID `35247db9...`. It embeds our firmware plus the stock V15 recovery image.
+- The source link points at a private repo, so the page is fine for personal flashing but must not be shared until the repo (or a release archive) is public.
+- Local serving: `.claude/launch.json` config `workbench` serves it at http://localhost:8766/FM1-Official-Open-Source.html. Web MIDI needs a secure context; localhost qualifies.
+- Not yet connected to or flashed onto a device.
+
 ## Constraints learned (don't relearn the hard way)
 - Audio code must be Flash-write safe: tag code `FM1_AUDIO_CODE`, initialized/const tables `FM1_AUDIO_DATA`, and avoid libc/libm and anything that may pull `libcompiler_rt` from Flash. That is why the audio path has no float, no 64-bit math and no variable division (macros step with incremental counters). 64-bit math exists only in init (`build_tables`).
 - Output is 44.1 kHz stereo, signed Q23, 128-frame blocks. The master gain is applied afterwards in `fm1_output_mix`.

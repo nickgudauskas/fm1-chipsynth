@@ -335,6 +335,7 @@
   "正在校验…": "Verifying…",
   "版本": "Version",
   "官方 Open 固件": "Official Open firmware",
+  "Chipwave 固件": "Chipwave firmware",
   "构建编号": "Build ID",
   "文件大小": "File size",
   "已保存需要保留的音色、工程和采样": "I have backed up the sounds, projects and samples I want to keep",
