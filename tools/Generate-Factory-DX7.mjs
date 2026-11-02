@@ -23,6 +23,7 @@ if(syxAt>0){
  }
 }
 // DX7 imitations of the chipsynth presets (app/chip_presets.c, same order).
+// Names fit the 7 characters the track overview shows.
 // FM can't switch duty or arpeggiate, so these approximate: a 2:1 modulator
 // gives odd harmonics (square), 1:1 a buzzier pulse, feedback at high ratios
 // noise, and the pitch EG (1 step = 1/32 octave around 50) the zap and coin.
@@ -48,29 +49,29 @@ const lead={r:[99,60,50,62],l:[99,96,96,0],out:99,v:2};
 const square={out:77,c:2};
 const noise={out:99,c:31,f:41,r:[99,70,50,75],l:[99,0,0,0]};
 const CHIP=[
- chipVoice({name:'CHIP LEAD',lfo:[55,20,10,0,0,2],
+ chipVoice({name:'SQ LEAD',lfo:[55,20,10,0,0,2],
   ops:x3(lead,{out:76,r:[99,60,50,62],l:[99,96,96,0]})}),
- chipVoice({name:'CHIP PWM',lfo:[50,30,8,0,0,2],   // detuned pairs beat like PWM
+ chipVoice({name:'PWM LD',lfo:[50,30,8,0,0,2],   // detuned pairs beat like PWM
   ops:[{...lead,d:4},{out:76,d:4,l:[99,96,96,0]},{...lead,d:10},{out:76,d:10,l:[99,96,96,0]},lead,{out:76,l:[99,96,96,0]}]}),
- chipVoice({name:'CHIP TRI',
+ chipVoice({name:'TRI BAS',
   ops:x3({out:99,v:2,r:[99,50,50,65],l:[99,99,99,0]},{out:58,c:2})}),
- chipVoice({name:'CHIP PLUCK',
+ chipVoice({name:'PLUCK',
   ops:x3({out:99,v:2,r:[99,55,50,75],l:[99,0,0,0]},{...square,r:[99,55,50,75],l:[99,40,40,0]})}),
- chipVoice({name:'CHIP CHORD',   // root, major third, fifth as three squares
+ chipVoice({name:'CHORD',   // root, major third, fifth as three squares
   ops:[{...lead,out:96},{out:76,c:2},{...lead,out:95,f:26},{out:76,c:2,f:26},{...lead,out:95,f:50},{out:76,c:3}]}),
- chipVoice({name:'CHIP ZAP',pr:[99,99,99,99],pl:[93,50,50,50],
+ chipVoice({name:'ZAP',pr:[99,99,99,99],pl:[93,50,50,50],
   ops:x3({out:99,v:2,r:[99,60,50,75],l:[99,0,0,0]},square)}),
- chipVoice({name:'CHIP COIN',pr:[10,99,99,99],pl:[49,63,63,50],
+ chipVoice({name:'COIN',pr:[10,99,99,99],pl:[49,63,63,50],
   ops:x3({out:99,v:2,r:[99,45,50,70],l:[99,0,0,0]},square)}),
- chipVoice({name:'GB WAVBASS',
+ chipVoice({name:'GB BASS',
   ops:x3({out:99,v:2,r:[99,50,50,65],l:[99,99,99,0]},{out:55})}),
- chipVoice({name:'NOISE HAT',fb:7,
+ chipVoice({name:'HAT',fb:7,
   ops:[{out:99,c:17,f:30,v:2,r:[99,72,50,80],l:[99,0,0,0]},{...noise,c:23},{},{},
    {out:99,c:13,f:50,v:2,r:[99,72,50,80],l:[99,0,0,0]},noise]}),
- chipVoice({name:'NOISE SNR',fb:7,
+ chipVoice({name:'SNARE',fb:7,
   ops:[{out:96,v:2,r:[99,65,50,75],l:[99,0,0,0]},{out:60,c:2},{},{},
    {out:99,c:9,f:20,v:2,r:[99,60,50,75],l:[99,0,0,0]},noise]}),
- chipVoice({name:'METALNOISE',fb:7,
+ chipVoice({name:'METAL',fb:7,
   ops:[{},{},{out:95,f:41,v:2,r:[99,50,50,65],l:[99,70,70,0]},{out:80,c:5,f:19},
    {out:99,c:3,f:17,v:2,r:[99,50,50,65],l:[99,70,70,0]},{...noise,r:[99,50,50,65],l:[99,70,70,0]}]}),
 ];
