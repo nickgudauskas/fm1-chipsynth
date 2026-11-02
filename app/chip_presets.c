@@ -11,7 +11,7 @@ static const int8_t pluck_duty[] FM1_AUDIO_DATA = { 2, 2, 1, 0 };
 static const int8_t chord_arp[] FM1_AUDIO_DATA = { 0, 4, 7 };
 static const int8_t zap_arp[] FM1_AUDIO_DATA = { 24, 19, 15, 12, 9, 6, 3, 0 };
 static const int8_t coin_arp[] FM1_AUDIO_DATA = { 0, 0, 5 };
-static const uint8_t gb_bass_wave[32] FM1_AUDIO_DATA = {
+static const uint8_t bass_wave[32] FM1_AUDIO_DATA = {
     8, 9, 11, 12, 13, 14, 14, 15, 15, 14, 14, 13, 12, 11, 9, 8,
     7, 6, 4, 3, 2, 1, 1, 0, 0, 1, 1, 2, 3, 4, 6, 7 };
 
@@ -44,7 +44,7 @@ const chip_inst_t chip_presets[] FM1_AUDIO_DATA = {
       .decay_frames = 4, .sustain = 0, .release_frames = 2, .macro_div = 3,
       .arp = MACRO(coin_arp, 0xFF) },
 
-    { .name = "GB Wave Bass", .wave = CHIP_WAVE, .wavetable = gb_bass_wave,
+    { .name = "Wave Bass", .wave = CHIP_WAVE, .wavetable = bass_wave,
       .sustain = 15, .release_frames = 2 },
 
     { .name = "Noise Hat", .wave = CHIP_NOISE,

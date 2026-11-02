@@ -16,6 +16,18 @@ FM1_AUDIO_CODE uint16_t chip_lfsr_step(uint16_t l, int short_mode)
     return (uint16_t)((l >> 1) | (fb << 14));
 }
 
+/* Sega's SN76489 variant: 16-bit register, white noise taps bits 0 and 3,
+ * periodic noise feeds bit 0 straight back (a 1-in-16 pulse train). */
+FM1_AUDIO_CODE uint16_t chip_sn_lfsr_step(uint16_t l, int periodic)
+{
+    uint16_t fb = (uint16_t)((periodic ? l : l ^ (l >> 3)) & 1u);
+    return (uint16_t)((l >> 1) | (fb << 15));
+}
+
+/* SN76489 volume: 2 dB per step, 8192 * 10^(-(15 - level) / 10); level 0 is off. */
+const int16_t chip_sn_vol[16] FM1_AUDIO_DATA = {
+    0, 326, 411, 517, 651, 819, 1031, 1298, 1635, 2058, 2591, 3261, 4106, 5169, 6507, 8192 };
+
 /* Control-context setup only (may take its time, not in the audio path). */
 static void build_tables(chip_t *c)
 {
@@ -288,7 +300,7 @@ FM1_AUDIO_CODE void chip_midi_event(chip_t *c, uint32_t ev)
     case 0xB0:
         switch (d1) {
         case 7:   c->gain_q8 = d2 == 127u ? 256 : (int)d2 * 2; break;
-        case 70:  c->flavor = d2 >= 64u ? CHIP_FLAVOR_GB : CHIP_FLAVOR_NES; break;
+        case 70:  c->flavor = d2 >= 64u ? CHIP_FLAVOR_SN : CHIP_FLAVOR_NES; break;
         case 71:  chip_set_mode(c, d2 < 43u ? CHIP_MODE_POLY : d2 < 86u ? CHIP_MODE_MONO : CHIP_MODE_CHIP); break;
         case 72:  c->glide_q8 = (int)d2 * 2; break;
         case 120: chip_all_off(c); break;
@@ -315,11 +327,23 @@ static inline __attribute__((always_inline)) int32_t chip_sample(chip_t *c)
             if (c->v[k].active) voice_tick(c, &c->v[k]);
     }
 
-    int psum = 0, tsum = 0, nsum = 0;
+    int psum = 0, tsum = 0, nsum = 0, ssum = 0;
     for (int k = 0; k < CHIP_MAX_VOICES; k++) {
         chip_voice_t *v = &c->v[k];
         if (!v->active) continue;
         int lvl = v->level;
+        if (c->flavor == CHIP_FLAVOR_SN) {   /* SN76489: 50% squares and noise, 2 dB steps */
+            if (v->type == CHIP_NOISE) {
+                uint32_t prev = v->nphase;
+                v->nphase += v->ninc;
+                if (v->nphase < prev) v->lfsr = chip_sn_lfsr_step(v->lfsr, v->inst->noise_short);
+                if (v->lfsr & 1) ssum += chip_sn_vol[lvl];
+            } else {
+                v->phase += v->inc;
+                if (!(v->phase >> 31)) ssum += chip_sn_vol[lvl];
+            }
+            continue;
+        }
         switch (v->type) {
         case CHIP_PULSE:
             v->phase += v->inc;
@@ -351,7 +375,7 @@ static inline __attribute__((always_inline)) int32_t chip_sample(chip_t *c)
         if (ti >= CHIP_TBL_N) ti = CHIP_TBL_N - 1;
         x = c->pulse_tbl[pi] + c->tnd_tbl[ti];
     } else {
-        x = (psum + tsum + nsum) * 1000;
+        x = ssum;                                /* the SN76489 sums its outputs linearly */
     }
 
     int32_t y = x - c->x1 + ((c->y1 * 32440) >> 15);   /* DC blocker, R ~ 0.99 */

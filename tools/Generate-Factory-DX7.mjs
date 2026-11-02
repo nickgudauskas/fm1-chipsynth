@@ -22,7 +22,8 @@ if(syxAt>0){
   fs.writeFileSync(`${dir}/FM1-V15-factory-${'ABCD'[b]}.syx`,Uint8Array.from([240,67,0,9,32,0,...bank,(-sum)&127,247]));
  }
 }
-// DX7 imitations of the chipsynth presets (app/chip_presets.c, same order).
+// DX7 imitations of the chipsynth NES presets (app/chip_presets.c order,
+// without the wave bass).
 // Names fit the 7 characters the track overview shows.
 // FM can't switch duty or arpeggiate, so these approximate: a 2:1 modulator
 // gives odd harmonics (square), 1:1 a buzzier pulse, feedback at high ratios
@@ -63,8 +64,6 @@ const CHIP=[
   ops:x3({out:99,v:2,r:[99,60,50,75],l:[99,0,0,0]},square)}),
  chipVoice({name:'COIN',pr:[10,99,99,99],pl:[49,63,63,50],
   ops:x3({out:99,v:2,r:[99,45,50,70],l:[99,0,0,0]},square)}),
- chipVoice({name:'GB BASS',
-  ops:x3({out:99,v:2,r:[99,50,50,65],l:[99,99,99,0]},{out:55})}),
  chipVoice({name:'HAT',fb:7,
   ops:[{out:99,c:17,f:30,v:2,r:[99,72,50,80],l:[99,0,0,0]},{...noise,c:23},{},{},
    {out:99,c:13,f:50,v:2,r:[99,72,50,80],l:[99,0,0,0]},noise]}),
@@ -75,14 +74,63 @@ const CHIP=[
   ops:[{},{},{out:95,f:41,v:2,r:[99,50,50,65],l:[99,70,70,0]},{out:80,c:5,f:19},
    {out:99,c:3,f:17,v:2,r:[99,50,50,65],l:[99,70,70,0]},{...noise,r:[99,50,50,65],l:[99,70,70,0]}]}),
 ];
-// Store only 43 distinct voices but keep 128 valid program numbers: slots
-// 0-10 the chip imitations, 11-42 the kept V15 voices (variants 1-2 of the 12
-// families in original slot order, then 8 one-off sounds), then that sequence
-// repeats. A repeat encodes as a single match of a few bytes.
+// Sega Genesis YM2612-style voices. The YM2612 is 4-operator FM; its
+// algorithms are DX7 algorithms with two operators silenced, so these use
+// two or three pairs of algorithm 5 (a third pair for loudness) (or algorithm 32 for the organ),
+// with feedback on OP6 like the YM2612's feedback on its first operator.
+const pluckEnv={r:[99,55,40,70],l:[99,85,80,0]};
+const GENESIS=[
+ chipVoice({name:'GN SLAP',   // slap bass: bright 1:1 attack that closes fast, plus a click
+  ops:[{out:99,v:2,...pluckEnv},{out:82,r:[99,70,50,70],l:[99,60,60,0]},
+   {out:99,d:9,v:2,...pluckEnv},{out:70,c:7,r:[99,85,50,80],l:[99,0,0,0]},
+   {out:99,d:5,v:2,...pluckEnv},{out:82,d:5,r:[99,70,50,70],l:[99,60,60,0]}]}),
+ chipVoice({name:'GN BASS',fb:6,   // saw-like feedback bass over a sine sub
+  ops:[{out:96,c:0,v:2,r:[99,50,50,70],l:[99,92,90,0]},{},
+   {out:99,d:9,v:2,r:[99,50,50,70],l:[99,92,90,0]},{out:85,d:9,r:[99,60,50,70],l:[99,80,75,0]},
+   {out:99,v:2,r:[99,50,50,70],l:[99,92,90,0]},{out:85,r:[99,60,50,70],l:[99,80,75,0]}]}),
+ chipVoice({name:'GN LEAD',fb:7,lfo:[60,30,8,0,0,3],   // feedback saw plus a detuned square
+  ops:[{out:99,d:9,v:2,r:[99,60,50,62],l:[99,96,96,0]},{out:76,c:2,d:9},
+   {out:99,d:5,v:2,r:[99,60,50,62],l:[99,96,96,0]},{out:76,c:2,d:5},
+   {out:99,v:2,r:[99,60,50,62],l:[99,96,96,0]},{out:80}]}),
+ chipVoice({name:'GN BRAS',lfo:[45,40,6,0,0,2],   // modulators swell in for the brass bite
+  ops:[{out:98,v:2,r:[70,50,50,65],l:[99,95,92,0]},{out:82,r:[55,50,50,70],l:[99,85,80,0]},
+   {out:98,d:9,v:2,r:[70,50,50,65],l:[99,95,92,0]},{out:82,d:9,r:[55,50,50,70],l:[99,85,80,0]},
+   {out:96,d:5,v:2,r:[70,50,50,65],l:[99,95,92,0]},{out:80,d:5,r:[55,50,50,70],l:[99,85,80,0]}]}),
+ chipVoice({name:'GN EPNO',   // FM electric piano: a ratio-14 tine over a 1:1 body
+  ops:[{out:99,v:3,r:[99,35,30,60],l:[99,80,0,0]},{out:68,c:14,r:[99,75,50,75],l:[99,0,0,0]},
+   {out:99,d:8,v:3,r:[99,35,30,60],l:[99,80,0,0]},{out:72,r:[99,45,40,60],l:[99,60,0,0]},
+   {out:99,d:6,v:3,r:[99,35,30,60],l:[99,80,0,0]},{out:72,d:6,r:[99,45,40,60],l:[99,60,0,0]}]}),
+ chipVoice({name:'GN BELL',   // inharmonic 3.5 and 5.4 ratios ring like a bell
+  ops:[{out:99,v:2,r:[99,30,25,45],l:[99,70,0,0]},{out:80,c:3,f:50,r:[99,40,30,50],l:[99,60,0,0]},
+   {out:97,c:2,v:2,r:[99,30,25,45],l:[99,70,0,0]},{out:70,c:5,f:40,r:[99,40,30,50],l:[99,60,0,0]},
+   {out:99,d:9,v:2,r:[99,30,25,45],l:[99,70,0,0]},{out:78,c:3,f:50,d:9,r:[99,40,30,50],l:[99,60,0,0]}]}),
+ chipVoice({name:'GN ORCH',fb:7,pr:[99,85,99,99],pl:[54,50,50,50],   // orchestra hit: root, fifth, octave
+  ops:[{out:98,v:2,r:[99,55,50,70],l:[99,0,0,0]},{out:85},{out:96,f:50,v:2,r:[99,55,50,70],l:[99,0,0,0]},
+   {out:85,f:50},{out:96,c:2,v:2,r:[99,55,50,70],l:[99,0,0,0]},{out:80}]}),
+ chipVoice({name:'GN KICK',pr:[99,92,99,99],pl:[82,50,50,50],   // one-octave pitch drop
+  ops:x3({out:99,v:2,r:[99,60,50,70],l:[99,0,0,0]},{out:65,r:[99,85,50,80],l:[99,0,0,0]})}),
+ chipVoice({name:'GN SNAR',fb:7,pr:[99,92,99,99],pl:[70,50,50,50],
+  ops:[{out:97,v:2,r:[99,65,50,75],l:[99,0,0,0]},{out:62,c:2},{out:95,c:2,f:30,v:2,r:[99,70,50,75],l:[99,0,0,0]},{},
+   {out:99,c:9,f:20,v:2,r:[99,58,50,75],l:[99,0,0,0]},noise]}),
+ chipVoice({name:'GN TOM',pr:[99,75,99,99],pl:[70,50,50,50],
+  ops:x3({out:99,v:2,r:[99,50,50,65],l:[99,0,0,0]},{out:60,r:[99,80,50,80],l:[99,0,0,0]})}),
+ chipVoice({name:'GN STRG',lfo:[40,50,6,0,0,2],   // three detuned pairs with a slow attack
+  ops:[{out:96,d:4,v:1,r:[45,50,50,55],l:[99,95,95,0]},{out:75,d:4},{out:96,d:10,v:1,r:[45,50,50,55],l:[99,95,95,0]},
+   {out:75,d:10},{out:96,v:1,r:[45,50,50,55],l:[99,95,95,0]},{out:75}]}),
+ chipVoice({name:'GN ORGN',alg:32,   // additive drawbars: 16', 8', 4', 2 2/3', 2'
+  ops:[{out:93,c:0,r:[99,99,99,80],l:[99,99,99,0]},{out:96,r:[99,99,99,80],l:[99,99,99,0]},
+   {out:95,c:2,r:[99,99,99,80],l:[99,99,99,0]},{out:90,c:3,r:[99,99,99,80],l:[99,99,99,0]},
+   {out:84,c:4,r:[99,99,99,80],l:[99,99,99,0]},{out:88,d:9,r:[99,99,99,80],l:[99,99,99,0]}]}),
+];
+// Store only 54 distinct voices but keep 128 valid program numbers: slots
+// 0-9 the NES-style chip voices, 10-21 the Genesis-style voices, 22-53 the
+// kept V15 voices (variants 1-2 of the 12 families in original slot order,
+// then 8 one-off sounds), then that sequence repeats. A repeat encodes as a
+// single match of a few bytes.
 const KEEP_MISC=[96,97,104,108,109,113,117,121];
 const kept=[...Array(96).keys()].filter(s=>((s%32)>>2)<2).concat(KEEP_MISC);
-const voices=[...CHIP,...kept.map(s=>original.subarray(s*128,s*128+128))];
-assert.equal(voices.length,43);
+const voices=[...CHIP,...GENESIS,...kept.map(s=>original.subarray(s*128,s*128+128))];
+assert.equal(voices.length,54);
 const raw=new Uint8Array(original.length);
 for(let s=0;s<128;s++)raw.set(voices[s%voices.length],s*128);
 // VMEM literals are seven-bit. A high bit denotes a 3..130-byte match,
@@ -106,10 +154,11 @@ for(let i=0;i<packed.length;){const token=packed[i++];if(token<128)decoded.push(
 assert.deepEqual(Buffer.from(decoded),Buffer.from(raw));
 const lines=[];for(let i=0;i<packed.length;i+=24)lines.push('    '+packed.slice(i,i+24).join(',')+',');
 const content='/* SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only WITH GPL-3.0-linking-exception\n'+
- ' * Slots 0-10: chipsynth-style voices written for FM1 Open (GPL-3.0-only, see\n'+
- ' * tools/Generate-Factory-DX7.mjs). Slots 11-42: 32 voices of the M-VAVE V15\n'+
- ' * factory DX7 bank, modified by selection and reordering; slots 43-127 repeat\n'+
- ' * 0-42. The full V15 bank ships as four DX7 library .syx files.\n'+
+ ' * Slots 0-9: NES-style and 10-21: Sega Genesis-style voices written for FM1\n'+
+ ' * Open (GPL-3.0-only, see tools/Generate-Factory-DX7.mjs). Slots 22-53: 32\n'+
+ ' * voices of the M-VAVE V15 factory DX7 bank, modified by selection and\n'+
+ ' * reordering; slots 54-127 repeat 0-53. The full V15 bank ships as four DX7\n'+
+ ' * library .syx files.\n'+
  ' * Regenerate: node tools/Generate-Factory-DX7.mjs [--syx DIR]\n'+
  ' * Original VMEM SHA-256: '+sha(original)+'\n'+
  ' * Bank VMEM SHA-256: '+sha(raw)+'\n'+
@@ -118,4 +167,4 @@ const content='/* SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only WITH GPL-
 const target=new URL('../app/fm_factory.inc',import.meta.url);
 if(process.argv.includes('--check'))assert.equal(fs.readFileSync(target,'utf8'),content);
 else fs.writeFileSync(target,content);
-console.log(`Factory bank: 11 chip + 32 V15 voices in 128 slots: ${raw.length} VMEM bytes, ${packed.length} encoded bytes.`);
+console.log(`Factory bank: 10 NES + 12 Genesis + 32 V15 voices in 128 slots: ${raw.length} VMEM bytes, ${packed.length} encoded bytes.`);

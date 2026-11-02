@@ -78,7 +78,7 @@ int main(void)
     }
     run(300);
 
-    cc(71, 60); cc(70, 100); program(7);                  /* 5. Game Boy flavor, wave bass */
+    cc(71, 60); cc(70, 100); program(7);                  /* 5. Genesis PSG (SN76489) flavor */
     int bass[] = { 33, 33, 40, 33, 36, 36, 43, 36 };
     for (int i = 0; i < 8; i++) { on(bass[i], 120); run(160); off(bass[i]); run(40); }
     run(300);

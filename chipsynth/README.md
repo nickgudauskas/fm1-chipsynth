@@ -1,6 +1,6 @@
-# chipsynth: NES / Game Boy voices for FM1 Open V14
+# chipsynth: NES / Sega Genesis PSG voices for FM1 Open V14
 
-A polyphonic chip engine (pulse with 4 duties, 32-step triangle, 4-bit wave table, LFSR noise) that plays alongside the instrument engine. It takes notes from one MIDI channel, so the FM1's own keys, USB/BLE/DIN MIDI and a DAW can all play it.
+A polyphonic chip engine (pulse with 4 duties, 32-step triangle, 4-bit wave table, LFSR noise; or the Genesis SN76489 PSG: 50% squares, 2 dB volume steps, Sega 16-bit noise) that plays alongside the instrument engine. It takes notes from one MIDI channel, so the FM1's own keys, USB/BLE/DIN MIDI and a DAW can all play it.
 
 ## How it fits this kit
 
@@ -37,8 +37,8 @@ patch -p1 < chipsynth/fm1-chip-engine.patch
 | MIDI on ch. 16 | Effect |
 |---|---|
 | Note on/off | Play |
-| Program Change 0-10 | Preset: Classic Lead, PWM Lead, Tri Bass, Pluck, Arp Chord, Zap, Coin, GB Wave Bass, Noise Hat, Noise Snare, Metal Noise |
-| CC 70 | Flavor: below 64 NES mixer, 64 and up Game Boy |
+| Program Change 0-10 | Preset: Classic Lead, PWM Lead, Tri Bass, Pluck, Arp Chord, Zap, Coin, Wave Bass, Noise Hat, Noise Snare, Metal Noise |
+| CC 70 | Flavor: below 64 NES (2A03 duties, triangle, nonlinear mixer), 64 and up Sega Genesis PSG (SN76489: every voice a 50% square, 2 dB steps, white or periodic noise) |
 | CC 71 | Mode: 0-42 poly, 43-85 mono legato, 86-127 chip (2 pulse, 1 triangle, noise for notes below C2) |
 | CC 72 | Mono portamento rate |
 | CC 7 | Chip volume |
@@ -46,6 +46,25 @@ patch -p1 < chipsynth/fm1-chip-engine.patch
 | CC 120 / 123 | All sound off / all notes off |
 
 Tunables in `chip_engine.h`: `CHIP_MIDI_CHANNEL`, `CHIP_OUT_SHIFT` (level into the mix).
+
+## Presets (projects)
+
+`presets/NES.fm1` and `presets/GENESIS.fm1` are ready-made projects with all 8 tracks on DX7 FM:
+
+| Track | NES | GENESIS |
+|---|---|---|
+| 1 | SQ LEAD | GN LEAD |
+| 2 | PWM LD | GN BRAS |
+| 3 | TRI BAS | GN SLAP |
+| 4 | HAT | GN KICK |
+| 5 | SNARE | GN SNAR |
+| 6 | CHORD | GN EPNO |
+| 7 | COIN | GN STRG |
+| 8 | METAL | GN ORCH |
+
+Load one in the Workbench (Projects & sounds, restore project file, or the simulator's file import), then save it to a USER slot. Rebuild them with `node chipsynth/presets/Make-Presets.mjs` after `tools/Build-Web.ps1 -LocalPreview`; the script drives the simulator core, so the files come from the panel's own export code.
+
+The DX7 bank (`tools/Generate-Factory-DX7.mjs`) holds the voices: slots 0-9 NES-style, 10-21 Genesis YM2612-style (4-operator style FM: slap bass, synth bass, lead, brass, e-piano, bell, orchestra hit, kick, snare, tom, strings, organ), 22-53 32 voices of the V15 bank.
 
 ## Host tests
 

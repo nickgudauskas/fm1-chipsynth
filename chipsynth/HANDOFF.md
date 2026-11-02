@@ -48,6 +48,12 @@ The device's DSP engine and sequencer are the sealed binary `sdk/lib/libfm1_engi
 - Local serving: `.claude/launch.json` config `workbench` serves it at http://localhost:8766/FM1-Official-Open-Source.html. Web MIDI needs a secure context; localhost qualifies.
 - Not yet connected to or flashed onto a device.
 
+## NES + Genesis (2026-11-02)
+- chipsynth's Game Boy flavor is replaced by an SN76489 (Genesis/Master System PSG) flavor on CC 70 >= 64: every tone voice a 50% square, 2 dB volume steps (`chip_sn_vol`), Sega 16-bit noise (taps 0 and 3, period 57337; periodic mode for `noise_short`). The NES path and its audio hash are unchanged. Host tests: 6 new checks.
+- DX7 bank: slots 0-9 NES-style (GB BASS dropped), 10-21 Genesis YM2612-style (GN SLAP, GN BASS, GN LEAD, GN BRAS, GN EPNO, GN BELL, GN ORCH, GN KICK, GN SNAR, GN TOM, GN STRG, GN ORGN), 22-53 V15, 54-127 repeat. Rendered peaks 0.22-0.31 (PIANO 1 0.29). Bank 4,235 bytes; firmware 451,492 bytes (2,429 free).
+- Presets: `chipsynth/presets/NES.fm1`, `GENESIS.fm1`, built by `Make-Presets.mjs` through the simulator core (select DX7, program change on each track's channel, render so MIDI applies, export, set name, clear mute/solo, re-import to verify). GENESIS loads in the browser Workbench and shows all 8 GN voices.
+- The real chipsynth engine is still separate (MIDI channel 16); projects can't hold it.
+
 ## Constraints learned (don't relearn the hard way)
 - Audio code must be Flash-write safe: tag code `FM1_AUDIO_CODE`, initialized/const tables `FM1_AUDIO_DATA`, and avoid libc/libm and anything that may pull `libcompiler_rt` from Flash. That is why the audio path has no float, no 64-bit math and no variable division (macros step with incremental counters). 64-bit math exists only in init (`build_tables`).
 - Output is 44.1 kHz stereo, signed Q23, 128-frame blocks. The master gain is applied afterwards in `fm1_output_mix`.

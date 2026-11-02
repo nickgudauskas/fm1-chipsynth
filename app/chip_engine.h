@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* chip_engine - polyphonic NES / Game Boy style voice engine for the FM1 app layer.
+/* chip_engine - polyphonic NES / Sega Genesis PSG style voice engine for the FM1 app layer.
  *
  * Integer-only audio path. It mixes into the block the sealed instrument engine
  * already rendered (signed Q23, interleaved L/R) and takes its notes from MIDI
@@ -24,7 +24,9 @@
 #define CHIP_TBL_N      512
 
 typedef enum { CHIP_PULSE = 0, CHIP_TRI, CHIP_WAVE, CHIP_NOISE } chip_wave_t;
-typedef enum { CHIP_FLAVOR_NES = 0, CHIP_FLAVOR_GB } chip_flavor_t;
+/* NES: 2A03 duties, triangle and nonlinear mixer. SN: Sega Genesis / Master
+ * System SN76489 PSG, every tone voice a 50% square, 2 dB volume steps. */
+typedef enum { CHIP_FLAVOR_NES = 0, CHIP_FLAVOR_SN } chip_flavor_t;
 typedef enum { CHIP_MODE_POLY = 0, CHIP_MODE_MONO, CHIP_MODE_CHIP } chip_mode_t;
 
 /* Per-frame sequence. len==0 disables the macro. loop==0xFF holds the last value.
@@ -105,6 +107,8 @@ FM1_AUDIO_CODE void chip_render_s16(chip_t *c, int16_t *out, unsigned frames);
 FM1_AUDIO_CODE void chip_render_q23_add(chip_t *c, int32_t *lr, unsigned frames);
 int chip_active_voices(const chip_t *c);
 FM1_AUDIO_CODE uint16_t chip_lfsr_step(uint16_t lfsr, int short_mode);
+FM1_AUDIO_CODE uint16_t chip_sn_lfsr_step(uint16_t lfsr, int periodic);
+extern const int16_t chip_sn_vol[16];
 
 extern const chip_inst_t chip_presets[];
 extern const int chip_num_presets;

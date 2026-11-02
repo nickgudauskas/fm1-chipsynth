@@ -39,6 +39,18 @@ int main(void)
         l = 1; p = 0;
         do { l = chip_lfsr_step(l, 1); p++; } while (l != 1 && p < 100000);
         CHECK(p == 93 || p == 31, "short-mode LFSR period = %d (expect 93 or 31)", p);
+        l = 0x8000; p = 0;
+        do { l = chip_sn_lfsr_step(l, 1); p++; } while (l != 0x8000 && p < 100000);
+        CHECK(p == 16, "SN76489 periodic noise period = %d (expect 16)", p);
+        l = 0x8000; p = 0;
+        do { l = chip_sn_lfsr_step(l, 0); p++; } while (l != 0x8000 && p < 100000);
+        CHECK(p > 30000 && p < 65536, "SN76489 white noise period = %d (Sega taps 0 and 3)", p);
+        double worst_db = 0;
+        for (int i = 2; i < 16; i++) {
+            double db = 20.0 * log10((double)chip_sn_vol[i] / chip_sn_vol[i - 1]);
+            if (fabs(db - 2.0) > worst_db) worst_db = fabs(db - 2.0);
+        }
+        CHECK(chip_sn_vol[0] == 0 && worst_db < 0.05, "SN76489 volume steps 2 dB apart (worst %.3f dB off), level 0 silent", worst_db);
     }
 
     /* 2. Integer pitch table accuracy */
@@ -76,6 +88,18 @@ int main(void)
             double r = hi / (double)SR;
             CHECK(fabs(r - expect[d]) < 0.01, "duty %d high ratio %.3f (expect %.3f)", d, r, expect[d]);
         }
+        /* The SN76489 has no duty control: every tone voice is a 50% square. */
+        for (int w = 0; w < 3; w++) {
+            chip_inst_t in = { .name = "t", .wave = (uint8_t)(w == 0 ? CHIP_PULSE : w == 1 ? CHIP_TRI : CHIP_WAVE),
+                               .duty = 0, .sustain = 15, .wavetable = chip_presets[7].wavetable };
+            render_note(&in, CHIP_FLAVOR_SN, 69);
+            int mn = 32767, mx = -32768;
+            for (int i = SR; i < SR * 2; i++) { if (buf[i] < mn) mn = buf[i]; if (buf[i] > mx) mx = buf[i]; }
+            int mid = (mn + mx) / 2, hi = 0;
+            for (int i = SR; i < SR * 2; i++) if (buf[i] > mid) hi++;
+            double r = hi / (double)SR;
+            CHECK(fabs(r - 0.5) < 0.01, "SN flavor %s voice high ratio %.3f (expect 0.500)", w == 0 ? "pulse" : w == 1 ? "triangle" : "wave", r);
+        }
     }
 
     /* 4. Measured pitch */
@@ -83,7 +107,7 @@ int main(void)
         int notes[3] = { 69, 57, 81 }; int hz[3] = { 440, 220, 880 };
         for (int k = 0; k < 3; k++) {
             chip_inst_t in = { .name = "t", .wave = CHIP_PULSE, .duty = 2, .sustain = 15 };
-            render_note(&in, CHIP_FLAVOR_GB, notes[k]);
+            render_note(&in, CHIP_FLAVOR_SN, notes[k]);
             int mn = 32767, mx = -32768;
             for (int i = SR; i < SR * 2; i++) { if (buf[i] < mn) mn = buf[i]; if (buf[i] > mx) mx = buf[i]; }
             int mid = (mn + mx) / 2, edges = 0;
@@ -139,13 +163,13 @@ int main(void)
 
         post(0, 0xC0 | CHIP_MIDI_CHANNEL, 5, 0, 2);
         post(0, 0xE0 | CHIP_MIDI_CHANNEL, 0, 127, 3);       /* bend fully up */
-        post(0, 0xB0 | CHIP_MIDI_CHANNEL, 70, 100, 3);      /* Game Boy flavor */
+        post(0, 0xB0 | CHIP_MIDI_CHANNEL, 70, 100, 3);      /* SN76489 (Genesis PSG) flavor */
         post(0, 0xB0 | CHIP_MIDI_CHANNEL, 71, 100, 3);      /* chip mode */
         chip_engine_render_add(q23, FM1_BLOCK_FRAMES);
         const chip_t *s = chip_engine_state();
         CHECK(s->inst == &chip_presets[5], "program change selects preset 5 (%s)", s->inst->name);
         CHECK(s->bend_q8 > 500 && s->bend_q8 <= 512, "pitch bend up = %d/256 semitone (about +2)", (int)s->bend_q8);
-        CHECK(s->flavor == CHIP_FLAVOR_GB && s->mode == CHIP_MODE_CHIP, "CC70/CC71 set flavor and mode");
+        CHECK(s->flavor == CHIP_FLAVOR_SN && s->mode == CHIP_MODE_CHIP, "CC70/CC71 set flavor and mode");
 
         /* Overflow: more than a queue's worth of events between blocks forces a safe reset. */
         chip_engine_init(SR);
