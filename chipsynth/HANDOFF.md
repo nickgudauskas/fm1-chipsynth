@@ -70,6 +70,10 @@ The device's DSP engine and sequencer are the sealed binary `sdk/lib/libfm1_engi
 - DX7 bank: GN CLAV, GN HARP, GN STAB, GN BLIP in slots 22-25 (rendered peaks 0.21-0.31); V15 voices now 26-57. Bank 4,396 bytes. NES/GENESIS presets unchanged (slots <= 21).
 - Host tests: 48 checks pass. Firmware 453,276 bytes, **645 free**; heap 220 KB.
 
+## Screen colour cycling (2026-11-02)
+- `app/screen.c`: the 8 track colours (`colors[]`, now RAM, from `base_colors[]`) and the accent (`ACCENT` is now the variable `accent`, following track colour 2) palette-rotate: each colour fades into its neighbour's in 8 steps, one step per 250 ms, a full turn in 16 s. `palette_step()` runs in `draw()`; when it moves, `saved_cache.shown_page = ~0U` forces a repaint (banded, off-screen, so no flicker). Text, DIM, GREEN, AMBER and BACK are fixed.
+- Checked in the browser simulator (colours rotate). Not checked on hardware: a full repaint 4 times a second; knob/key feedback has paint priority, but watch responsiveness and control-task load. Cost 128 bytes: firmware 453,404 bytes, **517 free**.
+
 ## Constraints learned (don't relearn the hard way)
 - Audio code must be Flash-write safe: tag code `FM1_AUDIO_CODE`, initialized/const tables `FM1_AUDIO_DATA`, and avoid libc/libm and anything that may pull `libcompiler_rt` from Flash. That is why the audio path has no float, no 64-bit math and no variable division (macros step with incremental counters). 64-bit math exists only in init (`build_tables`).
 - Output is 44.1 kHz stereo, signed Q23, 128-frame blocks. The master gain is applied afterwards in `fm1_output_mix`.

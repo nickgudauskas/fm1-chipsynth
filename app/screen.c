@@ -8,7 +8,6 @@ enum {
     BACK = 0x0000,
     PANEL = 0x18e3,
     TEXT = 0xef5d,
-    ACCENT = 0x07ff,
     DIM = 0x738e,
     GREEN = 0x07e0,
     AMBER = 0xfd20
@@ -126,7 +125,31 @@ static void text(unsigned x, unsigned y, const char *s, unsigned scale, uint16_t
 enum { OVERVIEW, STEPS, FM_EDIT, FM_ENV, FM_LFO, TONE_EDIT, MIX, BLE, PROJECT, NAME, EFFECTS, SOURCE, ACTIONS, STEP_EDIT, RHYTHM, FM_QUICK, PRESET_BROWSER, ARP_EDIT, STARTUP };
 enum { OCT_DOWN, OCT_UP, FX, SCL, ENV, LFO, EDIT, GLO, HOME, SAVE, ARP, SEQ, PLAY, REC };
 #define BUTTON(b) (1U << (b))
-static const uint16_t colors[8] = {0x3c9f, 0x07bf, 0x4eae, 0x06d4, 0xac9f, 0xed18, 0xff06, 0xfba5};
+/* Track colours and the accent slowly colour-cycle: each fades into its
+ * neighbour's in 8 steps, one step every 250 ms (a full turn in 16 s). Text,
+ * dim labels and the background stay fixed so everything stays readable. */
+static const uint16_t base_colors[8] = {0x3c9f, 0x07bf, 0x4eae, 0x06d4, 0xac9f, 0xed18, 0xff06, 0xfba5};
+static uint16_t colors[8] = {0x3c9f, 0x07bf, 0x4eae, 0x06d4, 0xac9f, 0xed18, 0xff06, 0xfba5};
+static uint16_t accent = 0x07bf;
+#define ACCENT accent
+static unsigned palette_phase;
+static uint16_t blend565(uint16_t a, uint16_t b, int t)  /* t in 0..8 */
+{
+    int r = (a >> 11) + ((((b >> 11) - (a >> 11)) * t) >> 3);
+    int g = ((a >> 5) & 63) + (((((b >> 5) & 63) - ((a >> 5) & 63)) * t) >> 3);
+    int l = (a & 31) + ((((b & 31) - (a & 31)) * t) >> 3);
+    return (uint16_t)(r << 11 | g << 5 | l);
+}
+static int palette_step(uint32_t now)  /* returns 1 when the colours moved */
+{
+    unsigned phase = (now / 250U) & 63U;
+    if (phase == palette_phase) return 0;
+    palette_phase = phase;
+    for (unsigned i = 0; i < 8; ++i)
+        colors[i] = blend565(base_colors[(i + phase / 8U) & 7U], base_colors[(i + phase / 8U + 1U) & 7U], (int)(phase & 7U));
+    accent = colors[1];
+    return 1;
+}
 static const uint8_t white_keys[16] = {0, 2, 4, 6, 7, 9, 11, 12, 14, 16, 18, 19, 21, 23, 24, 26};
 /* FM1 EDIT key IDs 15,17,19,22,24,27,29,31,34,36 minus 14. */
 static const uint8_t edit_keys[10] = {1, 3, 5, 8, 10, 13, 15, 17, 20, 22};
@@ -1594,6 +1617,7 @@ static void draw(const struct fm1_ble_status *ble)
 {
     unsigned visible = glo_down && glo_used ? MIX : page;
     frame_time = fm1_millis();
+    if (palette_step(frame_time)) saved_cache.shown_page = ~0U;   /* repaint in the new colours */
     if (boot_active) {
         boot_phase = (frame_time - boot_started) / 120U;
         if (boot_phase > 8) boot_phase = 8;
