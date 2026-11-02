@@ -88,15 +88,16 @@ int chip_active_voices(const chip_t *c)
 
 /* Macros advance one position per step with an incremental counter, so the audio
  * path never divides (no libcompiler_rt calls from Flash). pos is always < len. */
-static FM1_AUDIO_CODE int macro_at(const chip_macro_t *m, uint8_t pos, int def)
+static FM1_AUDIO_CODE int macro_at(chip_macro_t m, uint8_t pos, int def)
 {
-    return m->len ? m->v[pos] : def;
+    return m ? m[2 + pos] : def;
 }
 
-static FM1_AUDIO_CODE void macro_advance(const chip_macro_t *m, uint8_t *pos)
+static FM1_AUDIO_CODE void macro_advance(chip_macro_t m, uint8_t *pos)
 {
-    if (!m->len) return;
-    if (++*pos >= m->len) *pos = (m->loop == 0xFF || m->loop >= m->len) ? (uint8_t)(m->len - 1) : m->loop;
+    if (!m) return;
+    uint8_t len = (uint8_t)m[0], loop = (uint8_t)m[1];
+    if (++*pos >= len) *pos = (loop == 0xFF || loop >= len) ? (uint8_t)(len - 1) : loop;
 }
 
 static FM1_AUDIO_CODE uint32_t pitch_inc(const chip_t *c, int st_q8)
@@ -113,10 +114,10 @@ static FM1_AUDIO_CODE uint32_t pitch_inc(const chip_t *c, int st_q8)
 static FM1_AUDIO_CODE void voice_update(chip_t *c, chip_voice_t *v)
 {
     const chip_inst_t *in = v->inst;
-    int arp  = macro_at(&in->arp, v->mpos[0], 0);
-    int mvol = macro_at(&in->vol, v->mpos[2], 15);
-    int pit  = macro_at(&in->pitch, v->mpos[3], 0);
-    v->duty  = (uint8_t)(macro_at(&in->duty_m, v->mpos[1], in->duty) & 3);
+    int arp  = macro_at(in->arp, v->mpos[0], 0);
+    int mvol = macro_at(in->vol, v->mpos[2], 15);
+    int pit  = macro_at(in->pitch, v->mpos[3], 0);
+    v->duty  = (uint8_t)(macro_at(in->duty_m, v->mpos[1], in->duty) & 3);
     if (mvol < 0) mvol = 0;
     if (mvol > 15) mvol = 15;
     v->level = (uint8_t)(v->env * mvol / 15);
@@ -165,10 +166,10 @@ static FM1_AUDIO_CODE void voice_tick(chip_t *c, chip_voice_t *v)
     if (v->frame < 65535) v->frame++;
     if (++v->mdiv >= (in->macro_div ? in->macro_div : 1u)) {
         v->mdiv = 0;
-        macro_advance(&in->arp, &v->mpos[0]);
-        macro_advance(&in->duty_m, &v->mpos[1]);
-        macro_advance(&in->vol, &v->mpos[2]);
-        macro_advance(&in->pitch, &v->mpos[3]);
+        macro_advance(in->arp, &v->mpos[0]);
+        macro_advance(in->duty_m, &v->mpos[1]);
+        macro_advance(in->vol, &v->mpos[2]);
+        macro_advance(in->pitch, &v->mpos[3]);
     }
     v->vib_ph = (uint8_t)(v->vib_ph + in->vib_speed);
     voice_update(c, v);

@@ -29,19 +29,28 @@ typedef enum { CHIP_PULSE = 0, CHIP_TRI, CHIP_WAVE, CHIP_NOISE } chip_wave_t;
 typedef enum { CHIP_FLAVOR_NES = 0, CHIP_FLAVOR_SN } chip_flavor_t;
 typedef enum { CHIP_MODE_POLY = 0, CHIP_MODE_MONO, CHIP_MODE_CHIP } chip_mode_t;
 
-/* Per-frame sequence. len==0 disables the macro. loop==0xFF holds the last value.
- * v points at len values (at most CHIP_MACRO_LEN); the audio path reads them, so
- * in firmware they must be FM1_AUDIO_DATA like the preset itself. */
-typedef struct {
-    const int8_t *v;
-    uint8_t len;
-    uint8_t loop;
-} chip_macro_t;
+/* Per-frame sequence, stored as { len, loop, values... } (len 1..CHIP_MACRO_LEN;
+ * loop 0xFF holds the last value). A null pointer disables the macro. The audio
+ * path reads them, so in firmware they must be FM1_AUDIO_DATA like the preset.
+ * CHIP_MACRO(name, loop, values...) defines one. */
+typedef const int8_t *chip_macro_t;
+#define CHIP_MACRO(name, loop_at, ...) \
+    static const int8_t name[] FM1_AUDIO_DATA = { \
+        (int8_t)sizeof((int8_t[]){ __VA_ARGS__ }), (int8_t)(loop_at), __VA_ARGS__ }
+
+/* Names are for host tests and the demo only; the firmware never shows them. */
+#ifdef FM1_HOST_TEST
+#define CHIP_NAME(s) .name = s,
+#else
+#define CHIP_NAME(s)
+#endif
 
 struct chip_kit;
 
 typedef struct {
+#ifdef FM1_HOST_TEST
     const char *name;
+#endif
     const uint8_t *wavetable; /* 32 4-bit samples for CHIP_WAVE (FM1_AUDIO_DATA) */
     const struct chip_kit *kit; /* drum kit: each key plays its own part (FM1_AUDIO_DATA) */
     uint8_t wave;            /* chip_wave_t */

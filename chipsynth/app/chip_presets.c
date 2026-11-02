@@ -2,49 +2,48 @@
 #include "chip_engine.h"
 
 /* Read by the audio path (macros, wavetable): keep it where Flash writes can't stall it.
- * Macro values and wavetables live in their own arrays so presets that don't use
- * them cost a pointer, not a fixed-size buffer. */
-#define MACRO(values, loop_at) { values, (uint8_t)sizeof values, loop_at }
+ * Macros (CHIP_MACRO: length, loop, values) and wavetables live in their own
+ * arrays, so a preset that doesn't use one costs a null pointer. */
 
-static const int8_t pwm_duty[] FM1_AUDIO_DATA = { 0, 1, 2, 3, 2, 1 };
-static const int8_t pluck_duty[] FM1_AUDIO_DATA = { 2, 2, 1, 0 };
-static const int8_t chord_arp[] FM1_AUDIO_DATA = { 0, 4, 7 };
-static const int8_t zap_arp[] FM1_AUDIO_DATA = { 24, 19, 15, 12, 9, 6, 3, 0 };
-static const int8_t coin_arp[] FM1_AUDIO_DATA = { 0, 0, 5 };
-static const int8_t arp_major[] FM1_AUDIO_DATA = { 0, 4, 7 };
-static const int8_t arp_minor[] FM1_AUDIO_DATA = { 0, 3, 7 };
-static const int8_t arp_maj7[] FM1_AUDIO_DATA = { 0, 4, 7, 11 };
-static const int8_t arp_octave[] FM1_AUDIO_DATA = { 0, 12 };
-static const int8_t konami_duty[] FM1_AUDIO_DATA = { 2, 2, 1 };
-static const int8_t konami_scoop[] FM1_AUDIO_DATA = { -16, -8, -3, 0 };   /* 1/16 semitone */
-static const int8_t oneup_arp[] FM1_AUDIO_DATA = { 0, 4, 7, 12, 16, 19, 24 };
-static const int8_t powerup_arp[] FM1_AUDIO_DATA = { 0, 5, 7, 12, 17, 19, 24, 29, 31, 36 };
-static const int8_t jump_arp[] FM1_AUDIO_DATA = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
-static const int8_t laser_arp[] FM1_AUDIO_DATA = { 0, -3, -6, -9, -12, -15, -18, -21, -24 };
-static const int8_t boom_arp[] FM1_AUDIO_DATA = { 0, -2, -4, -6, -8, -10, -12, -14, -16 };
-static const int8_t chime_arp[] FM1_AUDIO_DATA = { 12, 0 };
-static const int8_t tremolo_vol[] FM1_AUDIO_DATA = { 15, 15, 8, 8 };
+CHIP_MACRO(pwm_duty, 0, 0, 1, 2, 3, 2, 1);
+CHIP_MACRO(pluck_duty, 0xFF, 2, 2, 1, 0);
+CHIP_MACRO(chord_arp, 0, 0, 4, 7);
+CHIP_MACRO(zap_arp, 0xFF, 24, 19, 15, 12, 9, 6, 3, 0);
+CHIP_MACRO(coin_arp, 0xFF, 0, 0, 5);
+CHIP_MACRO(arp_major, 0, 0, 4, 7);
+CHIP_MACRO(arp_minor, 0, 0, 3, 7);
+CHIP_MACRO(arp_maj7, 0, 0, 4, 7, 11);
+CHIP_MACRO(arp_octave, 0, 0, 12);
+CHIP_MACRO(konami_duty, 0xFF, 2, 2, 1);
+CHIP_MACRO(konami_scoop, 0xFF, -16, -8, -3, 0);   /* 1/16 semitone */
+CHIP_MACRO(oneup_arp, 0xFF, 0, 4, 7, 12, 16, 19, 24);
+CHIP_MACRO(powerup_arp, 0xFF, 0, 5, 7, 12, 17, 19, 24, 29, 31, 36);
+CHIP_MACRO(jump_arp, 0xFF, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+CHIP_MACRO(laser_arp, 0xFF, 0, -3, -6, -9, -12, -15, -18, -21, -24);
+CHIP_MACRO(boom_arp, 0xFF, 0, -2, -4, -6, -8, -10, -12, -14, -16);
+CHIP_MACRO(chime_arp, 0xFF, 12, 0);
+CHIP_MACRO(tremolo_vol, 0, 15, 15, 8, 8);
 /* Drum parts: one-shots that sweep down, as NES games built drums. */
-static const int8_t kick_arp[] FM1_AUDIO_DATA = { 24, 12, 5, 0, -5, -9, -12 };
-static const int8_t tom_arp[] FM1_AUDIO_DATA = { 7, 4, 2, 0, -2, -4, -6 };
-static const int8_t snare_arp[] FM1_AUDIO_DATA = { 12, 8, 4, 0 };
+CHIP_MACRO(kick_arp, 0xFF, 24, 12, 5, 0, -5, -9, -12);
+CHIP_MACRO(tom_arp, 0xFF, 7, 4, 2, 0, -2, -4, -6);
+CHIP_MACRO(snare_arp, 0xFF, 12, 8, 4, 0);
 static const uint8_t bass_wave[32] FM1_AUDIO_DATA = {
     8, 9, 11, 12, 13, 14, 14, 15, 15, 14, 14, 13, 12, 11, 9, 8,
     7, 6, 4, 3, 2, 1, 1, 0, 0, 1, 1, 2, 3, 4, 6, 7 };
 
-static const chip_inst_t kick FM1_AUDIO_DATA = { .name = "Kick", .wave = CHIP_TRI,
-    .decay_frames = 1, .sustain = 0, .release_frames = 1, .arp = MACRO(kick_arp, 0xFF) };
-static const chip_inst_t snare FM1_AUDIO_DATA = { .name = "Snare", .wave = CHIP_NOISE,
-    .decay_frames = 2, .sustain = 0, .release_frames = 1, .arp = MACRO(snare_arp, 0xFF) };
-static const chip_inst_t clap FM1_AUDIO_DATA = { .name = "Clap", .wave = CHIP_NOISE, .noise_short = 1,
+static const chip_inst_t kick FM1_AUDIO_DATA = { CHIP_NAME("Kick") .wave = CHIP_TRI,
+    .decay_frames = 1, .sustain = 0, .release_frames = 1, .arp = kick_arp };
+static const chip_inst_t snare FM1_AUDIO_DATA = { CHIP_NAME("Snare") .wave = CHIP_NOISE,
+    .decay_frames = 2, .sustain = 0, .release_frames = 1, .arp = snare_arp };
+static const chip_inst_t clap FM1_AUDIO_DATA = { CHIP_NAME("Clap") .wave = CHIP_NOISE, .noise_short = 1,
     .decay_frames = 1, .sustain = 0, .release_frames = 1 };
-static const chip_inst_t tom FM1_AUDIO_DATA = { .name = "Tom", .wave = CHIP_TRI,
-    .decay_frames = 3, .sustain = 0, .release_frames = 2, .arp = MACRO(tom_arp, 0xFF) };
-static const chip_inst_t hat FM1_AUDIO_DATA = { .name = "Closed Hat", .wave = CHIP_NOISE,
+static const chip_inst_t tom FM1_AUDIO_DATA = { CHIP_NAME("Tom") .wave = CHIP_TRI,
+    .decay_frames = 3, .sustain = 0, .release_frames = 2, .arp = tom_arp };
+static const chip_inst_t hat FM1_AUDIO_DATA = { CHIP_NAME("Closed Hat") .wave = CHIP_NOISE,
     .decay_frames = 1, .sustain = 0, .release_frames = 1 };
-static const chip_inst_t open_hat FM1_AUDIO_DATA = { .name = "Open Hat", .wave = CHIP_NOISE,
+static const chip_inst_t open_hat FM1_AUDIO_DATA = { CHIP_NAME("Open Hat") .wave = CHIP_NOISE,
     .decay_frames = 3, .sustain = 0, .release_frames = 2 };
-static const chip_inst_t crash FM1_AUDIO_DATA = { .name = "Crash", .wave = CHIP_NOISE,
+static const chip_inst_t crash FM1_AUDIO_DATA = { CHIP_NAME("Crash") .wave = CHIP_NOISE,
     .decay_frames = 7, .sustain = 0, .release_frames = 4 };
 /* General MIDI layout within each octave: C kick, C# clap, D snare, D# clap,
  * E snare, F/G/A toms, F# and G# closed hat, A# open hat, B crash. */
@@ -54,93 +53,93 @@ static const struct chip_kit drum_kit FM1_AUDIO_DATA = {
 };
 
 const chip_inst_t chip_presets[] FM1_AUDIO_DATA = {
-    { .name = "Classic Lead", .wave = CHIP_PULSE, .duty = 1,
+    { CHIP_NAME("Classic Lead") .wave = CHIP_PULSE, .duty = 1,
       .sustain = 12, .release_frames = 3,
       .vib_delay = 12, .vib_speed = 40, .vib_depth = 3 },
 
-    { .name = "PWM Lead", .wave = CHIP_PULSE, .duty = 1,
+    { CHIP_NAME("PWM Lead") .wave = CHIP_PULSE, .duty = 1,
       .sustain = 13, .release_frames = 3, .macro_div = 6,
-      .duty_m = MACRO(pwm_duty, 0),
+      .duty_m = pwm_duty,
       .vib_delay = 20, .vib_speed = 36, .vib_depth = 2 },
 
-    { .name = "Tri Bass", .wave = CHIP_TRI,
+    { CHIP_NAME("Tri Bass") .wave = CHIP_TRI,
       .sustain = 15, .release_frames = 2 },
 
-    { .name = "Pluck", .wave = CHIP_PULSE, .duty = 2,
+    { CHIP_NAME("Pluck") .wave = CHIP_PULSE, .duty = 2,
       .decay_frames = 2, .sustain = 0, .release_frames = 1,
-      .duty_m = MACRO(pluck_duty, 0xFF) },
+      .duty_m = pluck_duty },
 
-    { .name = "Arp Chord", .wave = CHIP_PULSE, .duty = 1,
+    { CHIP_NAME("Arp Chord") .wave = CHIP_PULSE, .duty = 1,
       .sustain = 11, .release_frames = 2, .macro_div = 2,
-      .arp = MACRO(chord_arp, 0) },
+      .arp = chord_arp },
 
-    { .name = "Zap", .wave = CHIP_PULSE, .duty = 2,
+    { CHIP_NAME("Zap") .wave = CHIP_PULSE, .duty = 2,
       .decay_frames = 1, .sustain = 0, .release_frames = 1,
-      .arp = MACRO(zap_arp, 0xFF) },
+      .arp = zap_arp },
 
-    { .name = "Coin", .wave = CHIP_PULSE, .duty = 2,
+    { CHIP_NAME("Coin") .wave = CHIP_PULSE, .duty = 2,
       .decay_frames = 4, .sustain = 0, .release_frames = 2, .macro_div = 3,
-      .arp = MACRO(coin_arp, 0xFF) },
+      .arp = coin_arp },
 
-    { .name = "Wave Bass", .wave = CHIP_WAVE, .wavetable = bass_wave,
+    { CHIP_NAME("Wave Bass") .wave = CHIP_WAVE, .wavetable = bass_wave,
       .sustain = 15, .release_frames = 2 },
 
-    { .name = "Noise Hat", .wave = CHIP_NOISE,
+    { CHIP_NAME("Noise Hat") .wave = CHIP_NOISE,
       .decay_frames = 1, .sustain = 0, .release_frames = 1 },
 
-    { .name = "Noise Snare", .wave = CHIP_NOISE,
+    { CHIP_NAME("Noise Snare") .wave = CHIP_NOISE,
       .decay_frames = 2, .sustain = 0, .release_frames = 1 },
 
-    { .name = "Metal Noise", .wave = CHIP_NOISE, .noise_short = 1,
+    { CHIP_NAME("Metal Noise") .wave = CHIP_NOISE, .noise_short = 1,
       .decay_frames = 3, .sustain = 4, .release_frames = 2 },
 
     /* 11- added presets; program numbers 0-10 above are unchanged. */
-    { .name = "Drum Kit", .kit = &drum_kit },
+    { CHIP_NAME("Drum Kit") .kit = &drum_kit },
 
-    { .name = "Konami Lead", .wave = CHIP_PULSE, .duty = 1,   /* 50% bite, then 25%, scooped in */
+    { CHIP_NAME("Konami Lead") .wave = CHIP_PULSE, .duty = 1,   /* 50% bite, then 25%, scooped in */
       .decay_frames = 4, .sustain = 10, .release_frames = 3, .macro_div = 2,
-      .duty_m = MACRO(konami_duty, 0xFF), .pitch = MACRO(konami_scoop, 0xFF),
+      .duty_m = konami_duty, .pitch = konami_scoop,
       .vib_delay = 10, .vib_speed = 48, .vib_depth = 4 },
 
-    { .name = "Arp Major", .wave = CHIP_PULSE, .duty = 1,
-      .sustain = 11, .release_frames = 2, .arp = MACRO(arp_major, 0) },
+    { CHIP_NAME("Arp Major") .wave = CHIP_PULSE, .duty = 1,
+      .sustain = 11, .release_frames = 2, .arp = arp_major },
 
-    { .name = "Arp Minor", .wave = CHIP_PULSE, .duty = 1,
-      .sustain = 11, .release_frames = 2, .arp = MACRO(arp_minor, 0) },
+    { CHIP_NAME("Arp Minor") .wave = CHIP_PULSE, .duty = 1,
+      .sustain = 11, .release_frames = 2, .arp = arp_minor },
 
-    { .name = "Arp Maj7", .wave = CHIP_PULSE, .duty = 2,
-      .sustain = 11, .release_frames = 2, .arp = MACRO(arp_maj7, 0) },
+    { CHIP_NAME("Arp Maj7") .wave = CHIP_PULSE, .duty = 2,
+      .sustain = 11, .release_frames = 2, .arp = arp_maj7 },
 
-    { .name = "Arp Octave", .wave = CHIP_PULSE, .duty = 0,
-      .sustain = 11, .release_frames = 2, .macro_div = 2, .arp = MACRO(arp_octave, 0) },
+    { CHIP_NAME("Arp Octave") .wave = CHIP_PULSE, .duty = 0,
+      .sustain = 11, .release_frames = 2, .macro_div = 2, .arp = arp_octave },
 
-    { .name = "Pulse Bass", .wave = CHIP_PULSE, .duty = 2,
+    { CHIP_NAME("Pulse Bass") .wave = CHIP_PULSE, .duty = 2,
       .decay_frames = 2, .sustain = 8, .release_frames = 1 },
 
-    { .name = "1-Up", .wave = CHIP_PULSE, .duty = 1,
+    { CHIP_NAME("1-Up") .wave = CHIP_PULSE, .duty = 1,
       .decay_frames = 6, .sustain = 0, .release_frames = 2, .macro_div = 4,
-      .arp = MACRO(oneup_arp, 0xFF) },
+      .arp = oneup_arp },
 
-    { .name = "Power Up", .wave = CHIP_PULSE, .duty = 2,
+    { CHIP_NAME("Power Up") .wave = CHIP_PULSE, .duty = 2,
       .decay_frames = 4, .sustain = 0, .release_frames = 2, .macro_div = 2,
-      .arp = MACRO(powerup_arp, 0xFF) },
+      .arp = powerup_arp },
 
-    { .name = "Jump", .wave = CHIP_PULSE, .duty = 2,
-      .decay_frames = 2, .sustain = 0, .release_frames = 1, .arp = MACRO(jump_arp, 0xFF) },
+    { CHIP_NAME("Jump") .wave = CHIP_PULSE, .duty = 2,
+      .decay_frames = 2, .sustain = 0, .release_frames = 1, .arp = jump_arp },
 
-    { .name = "Laser", .wave = CHIP_PULSE, .duty = 0,
-      .decay_frames = 1, .sustain = 0, .release_frames = 1, .arp = MACRO(laser_arp, 0xFF) },
+    { CHIP_NAME("Laser") .wave = CHIP_PULSE, .duty = 0,
+      .decay_frames = 1, .sustain = 0, .release_frames = 1, .arp = laser_arp },
 
-    { .name = "Explosion", .wave = CHIP_NOISE,
+    { CHIP_NAME("Explosion") .wave = CHIP_NOISE,
       .decay_frames = 6, .sustain = 0, .release_frames = 3, .macro_div = 3,
-      .arp = MACRO(boom_arp, 0xFF) },
+      .arp = boom_arp },
 
-    { .name = "Chime", .wave = CHIP_PULSE, .duty = 0,
+    { CHIP_NAME("Chime") .wave = CHIP_PULSE, .duty = 0,
       .decay_frames = 6, .sustain = 0, .release_frames = 4, .macro_div = 3,
-      .arp = MACRO(chime_arp, 0xFF), .vib_delay = 20, .vib_speed = 30, .vib_depth = 2 },
+      .arp = chime_arp, .vib_delay = 20, .vib_speed = 30, .vib_depth = 2 },
 
-    { .name = "Tremolo Lead", .wave = CHIP_PULSE, .duty = 1,
-      .sustain = 13, .release_frames = 3, .macro_div = 3, .vol = MACRO(tremolo_vol, 0) },
+    { CHIP_NAME("Tremolo Lead") .wave = CHIP_PULSE, .duty = 1,
+      .sustain = 13, .release_frames = 3, .macro_div = 3, .vol = tremolo_vol },
 };
 
 const int chip_num_presets FM1_AUDIO_DATA = (int)(sizeof chip_presets / sizeof chip_presets[0]);
