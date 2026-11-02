@@ -178,6 +178,15 @@ static FM1_AUDIO_CODE void voice_trigger(chip_t *c, chip_voice_t *v, int note, i
                                          chip_wave_t type, int legato)
 {
     const chip_inst_t *in = c->inst;
+    int key = note;
+    if (in->kit) {                       /* drum kit: the key picks the part and its note */
+        unsigned k = (unsigned)note % 12u;
+        const chip_inst_t *part = in->kit->part[k];
+        if (!part) return;
+        note = in->kit->note[k];
+        type = (chip_wave_t)part->wave;
+        in = part;
+    }
     int lvl = (vel * 15 + 126) / 127;
     if (lvl < 1) lvl = 1;
     if (lvl > 15) lvl = 15;
@@ -186,6 +195,7 @@ static FM1_AUDIO_CODE void voice_trigger(chip_t *c, chip_voice_t *v, int note, i
     v->inst = in;
     v->type = (uint8_t)type;
     v->note = note;
+    v->key = key;
     v->vel = (uint8_t)vel;
     v->age = ++c->age_ctr;
     if (!legato) {
@@ -249,7 +259,7 @@ FM1_AUDIO_CODE void chip_note_on(chip_t *c, int note, int vel)
             return;
         }
         for (int i = 0; i < 3; i++)            /* same note held: retrigger in place */
-            if (c->v[i].active && c->v[i].gate && c->v[i].note == note) {
+            if (c->v[i].active && c->v[i].gate && c->v[i].key == note) {
                 voice_trigger(c, &c->v[i], note, vel, i == 2 ? CHIP_TRI : CHIP_PULSE, 0);
                 return;
             }
@@ -258,7 +268,7 @@ FM1_AUDIO_CODE void chip_note_on(chip_t *c, int note, int vel)
         return;
     }
     for (int i = 0; i < c->num_voices; i++)    /* poly */
-        if (c->v[i].active && c->v[i].gate && c->v[i].note == note) {
+        if (c->v[i].active && c->v[i].gate && c->v[i].key == note) {
             voice_trigger(c, &c->v[i], note, vel, c->inst->wave, 0);
             return;
         }
@@ -271,7 +281,7 @@ FM1_AUDIO_CODE void chip_note_off(chip_t *c, int note)
         held_remove(c, note);
         chip_voice_t *v = &c->v[0];
         if (c->nheld > 0) {
-            if (v->active && v->gate) v->note = c->held[c->nheld - 1];
+            if (v->active && v->gate) v->note = v->key = c->held[c->nheld - 1];
         } else if (v->active && v->gate) {
             v->gate = 0;
             v->env_cnt = 0;
@@ -281,7 +291,7 @@ FM1_AUDIO_CODE void chip_note_off(chip_t *c, int note)
     chip_voice_t *best = 0;
     for (int i = 0; i < CHIP_MAX_VOICES; i++) {
         chip_voice_t *v = &c->v[i];
-        if (v->active && v->gate && v->note == note && (!best || v->age < best->age)) best = v;
+        if (v->active && v->gate && v->key == note && (!best || v->age < best->age)) best = v;
     }
     if (best) { best->gate = 0; best->env_cnt = 0; }
 }

@@ -54,6 +54,12 @@ The device's DSP engine and sequencer are the sealed binary `sdk/lib/libfm1_engi
 - Presets: `chipsynth/presets/NES.fm1`, `GENESIS.fm1`, built by `Make-Presets.mjs` through the simulator core (select DX7, program change on each track's channel, render so MIDI applies, export, set name, clear mute/solo, re-import to verify). GENESIS loads in the browser Workbench and shows all 8 GN voices.
 - The real chipsynth engine is still separate (MIDI channel 16); projects can't hold it.
 
+## More chipsynth presets (2026-11-02)
+- 14 presets added after the original 11 (program numbers 0-10 unchanged): Drum Kit, Konami Lead, Arp Major / Minor / Maj7 / Octave, Pulse Bass, 1-Up, Power Up, Jump, Laser, Explosion, Chime, Tremolo Lead. 25 in all.
+- Engine: `chip_inst_t.kit` points at a `struct chip_kit` (12 parts + fixed notes by key % 12); voices keep the pressed `key` separately from the sounding `note`, and note-off/retrigger match on `key`.
+- Host tests: every preset sounds in NES and SN flavors (peak 13,823), kit mapping and release over 6 octaves, Arp Major cycles 3 pitches. Original audio hash unchanged. `host/demo.wav` adds a drum beat and a Konami lead (28 s).
+- Firmware 453,076 bytes: only 845 bytes free. A preset record is about 56 bytes (mostly unused macro slots). Before adding more, free space: e.g. the bit-level factory-bank coder (about 1.5 KB) or compact macro storage.
+
 ## Constraints learned (don't relearn the hard way)
 - Audio code must be Flash-write safe: tag code `FM1_AUDIO_CODE`, initialized/const tables `FM1_AUDIO_DATA`, and avoid libc/libm and anything that may pull `libcompiler_rt` from Flash. That is why the audio path has no float, no 64-bit math and no variable division (macros step with incremental counters). 64-bit math exists only in init (`build_tables`).
 - Output is 44.1 kHz stereo, signed Q23, 128-frame blocks. The master gain is applied afterwards in `fm1_output_mix`.

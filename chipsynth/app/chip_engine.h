@@ -38,9 +38,12 @@ typedef struct {
     uint8_t loop;
 } chip_macro_t;
 
+struct chip_kit;
+
 typedef struct {
     const char *name;
     const uint8_t *wavetable; /* 32 4-bit samples for CHIP_WAVE (FM1_AUDIO_DATA) */
+    const struct chip_kit *kit; /* drum kit: each key plays its own part (FM1_AUDIO_DATA) */
     uint8_t wave;            /* chip_wave_t */
     uint8_t duty;            /* 0..3 = 12.5 / 25 / 50 / 75 % */
     uint8_t noise_short;     /* 1 = short (metallic) LFSR */
@@ -57,12 +60,20 @@ typedef struct {
     chip_macro_t pitch;      /* 1/16 semitone */
 } chip_inst_t;
 
+/* Drum kit, by key within the octave (C = 0). A part plays at its own fixed
+ * note whatever octave is pressed; a null part leaves that key silent. */
+struct chip_kit {
+    const chip_inst_t *part[12];
+    uint8_t note[12];
+};
+
 typedef struct {
     uint8_t active, gate, type, vel, duty, env, env_cnt, sus, level, vib_ph;
     uint8_t mdiv;            /* frames since the last macro step */
     uint8_t mpos[4];         /* macro positions: arp, duty, vol, pitch */
     const chip_inst_t *inst;
-    int note;
+    int note;                /* sounding note (a kit part's own note) */
+    int key;                 /* key that started it, for note-off */
     uint32_t age;
     uint32_t phase, inc;
     uint16_t lfsr;

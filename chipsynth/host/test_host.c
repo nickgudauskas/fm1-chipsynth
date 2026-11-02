@@ -227,6 +227,56 @@ int main(void)
         CHECK(h[0] == h[1], "two identical runs give identical audio (hash %lx)", h[0]);
     }
 
+    /* 9. Every preset sounds in both flavors; kits map keys; arps cycle */
+    {
+        int silent = 0; long worst = 0;
+        for (int f = 0; f < 2; f++)
+            for (int p = 0; p < chip_num_presets; p++) {
+                chip_t c; chip_init(&c, SR); chip_set_preset(&c, (unsigned)p);
+                chip_set_flavor(&c, f ? CHIP_FLAVOR_SN : CHIP_FLAVOR_NES);
+                chip_note_on(&c, 60, 127);
+                chip_render_s16(&c, buf, SR / 2);
+                long peak = 0;
+                for (int i = 0; i < SR / 2; i++) if (abs(buf[i]) > peak) peak = abs(buf[i]);
+                if (peak < 500) { silent++; printf("      silent: %s (%s)\n", chip_presets[p].name, f ? "SN" : "NES"); }
+                if (peak > worst) worst = peak;
+            }
+        CHECK(silent == 0 && worst < 32767, "all %d presets sound in NES and SN flavors (peak %ld)", chip_num_presets, worst);
+
+        int kit = -1;
+        for (int p = 0; p < chip_num_presets; p++) if (chip_presets[p].kit) kit = p;
+        CHECK(kit >= 0, "a drum kit preset exists (%s)", kit >= 0 ? chip_presets[kit].name : "none");
+        if (kit >= 0) {
+            const struct chip_kit *k = chip_presets[kit].kit;
+            int ok = 1;
+            for (int key = 24; key < 96; key++) {             /* every key, several octaves */
+                chip_t c; chip_init(&c, SR); chip_set_preset(&c, (unsigned)kit);
+                chip_note_on(&c, key, 100);
+                const chip_voice_t *v = &c.v[0];
+                const chip_inst_t *part = k->part[key % 12];
+                if (!v->active || v->inst != part || v->note != k->note[key % 12] || v->type != part->wave) ok = 0;
+                chip_note_off(&c, key);
+                if (v->gate) ok = 0;                          /* note-off finds the voice by key */
+            }
+            CHECK(ok, "kit: each key plays its part at the part's own note, and note-off releases it");
+        }
+
+        int major = -1;
+        for (int p = 0; p < chip_num_presets; p++) if (!strcmp(chip_presets[p].name, "Arp Major")) major = p;
+        chip_t c; chip_init(&c, SR); chip_set_preset(&c, (unsigned)major);
+        chip_note_on(&c, 60, 100);
+        uint32_t seen[3] = { 0 }; int distinct = 0;
+        for (int fr = 0; fr < 6; fr++) {
+            chip_render_s16(&c, buf, SR / CHIP_FRAME_HZ);
+            uint32_t inc = c.v[0].inc; int known = 0;
+            for (int i = 0; i < distinct; i++) known |= seen[i] == inc;
+            if (!known && distinct < 3) seen[distinct++] = inc;
+        }
+        uint32_t lo = seen[0] < seen[1] ? seen[0] : seen[1];
+        lo = lo < seen[2] ? lo : seen[2];
+        CHECK(major >= 0 && distinct == 3 && lo == c.inc_tbl[60], "Arp Major cycles 3 pitches from the played note");
+    }
+
     printf(fails ? "\n%d test(s) FAILED\n" : "\nAll tests passed\n", fails);
     return fails ? 1 : 0;
 }

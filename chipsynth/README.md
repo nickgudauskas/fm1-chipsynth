@@ -37,13 +37,15 @@ patch -p1 < chipsynth/fm1-chip-engine.patch
 | MIDI on ch. 16 | Effect |
 |---|---|
 | Note on/off | Play |
-| Program Change 0-10 | Preset: Classic Lead, PWM Lead, Tri Bass, Pluck, Arp Chord, Zap, Coin, Wave Bass, Noise Hat, Noise Snare, Metal Noise |
+| Program Change 0-24 | Preset: 0 Classic Lead, 1 PWM Lead, 2 Tri Bass, 3 Pluck, 4 Arp Chord, 5 Zap, 6 Coin, 7 Wave Bass, 8 Noise Hat, 9 Noise Snare, 10 Metal Noise, 11 Drum Kit, 12 Konami Lead, 13 Arp Major, 14 Arp Minor, 15 Arp Maj7, 16 Arp Octave, 17 Pulse Bass, 18 1-Up, 19 Power Up, 20 Jump, 21 Laser, 22 Explosion, 23 Chime, 24 Tremolo Lead |
 | CC 70 | Flavor: below 64 NES (2A03 duties, triangle, nonlinear mixer), 64 and up Sega Genesis PSG (SN76489: every voice a 50% square, 2 dB steps, white or periodic noise) |
 | CC 71 | Mode: 0-42 poly, 43-85 mono legato, 86-127 chip (2 pulse, 1 triangle, noise for notes below C2) |
 | CC 72 | Mono portamento rate |
 | CC 7 | Chip volume |
 | Pitch bend | plus or minus 2 semitones |
 | CC 120 / 123 | All sound off / all notes off |
+
+**Drum Kit (11)** plays a different drum on each key, the same in every octave (General MIDI layout): C kick, C# and D# clap, D and E snare, F / G / A low, mid and high tom, F# and G# closed hat, A# open hat, B crash. Each drum has its own fixed pitch, so any octave works.
 
 Tunables in `chip_engine.h`: `CHIP_MIDI_CHANNEL`, `CHIP_OUT_SHIFT` (level into the mix).
 

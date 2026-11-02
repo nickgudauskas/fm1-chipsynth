@@ -56,7 +56,7 @@ int main(void)
     for (int p = 0; p < chip_num_presets; p++) {          /* 1. preset tour via Program Change */
         program(p);
         printf("preset %d: %s\n", p, chip_presets[p].name);
-        note(p == 2 || p == 7 ? 36 : (p >= 8 ? 40 : 60), 450, 120);
+        note(p == 2 || p == 7 || p == 11 || p == 17 ? 36 : (p >= 8 && p <= 10) || p == 22 ? 40 : 60, 450, 120);
     }
     run(300);
 
@@ -82,6 +82,22 @@ int main(void)
     int bass[] = { 33, 33, 40, 33, 36, 36, 43, 36 };
     for (int i = 0; i < 8; i++) { on(bass[i], 120); run(160); off(bass[i]); run(40); }
     run(300);
+
+    cc(70, 0); cc(71, 0); program(11);                    /* 6. drum kit beat: C kick, D snare, F# hat */
+    for (int bar = 0; bar < 2; bar++)
+        for (int s = 0; s < 8; s++) {
+            if (s % 4 == 0) on(36, 120);
+            if (s % 4 == 2) on(38, 110);
+            on(42, s % 2 ? 70 : 90);
+            run(125);
+            off(36); off(38); off(42);
+        }
+    run(200);
+
+    program(12);                                          /* 7. Konami-style lead melody */
+    int lead[] = { 64, 67, 71, 72, 71, 67, 69, 71 };
+    for (int i = 0; i < 8; i++) { on(lead[i], 110); run(i == 7 ? 600 : 220); off(lead[i]); run(30); }
+    run(400);
 
     write_wav("demo.wav");
     printf("wrote demo.wav: %.1f s, %d Hz stereo\n", frames_out / (double)SR, SR);
