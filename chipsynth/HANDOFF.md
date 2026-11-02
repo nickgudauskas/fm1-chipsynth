@@ -32,7 +32,13 @@ The device's DSP engine and sequencer are the sealed binary `sdk/lib/libfm1_engi
 - `--syx DIR` writes the untouched bank as `FM1-V15-factory-A`..`D.syx` (checked byte-identical to the original). They're in `chipsynth/factory-syx/`. The web tool's DX7 library section ("replace this group of 32 voices from file", groups A-D) accepts 4104-byte bank .syx, so users can restore any original slot without firmware space. That upload path was checked in the code only, not on a device.
 - `THIRD_PARTY.md` and the `.inc` header mark the bank as modified (Apache-2.0).
 - Build with chipsynth applied: app image 450,532 bytes, 3,389 bytes under the 453,921 limit; `FM1_OFFICIAL_OPEN.fwsc` written (492,084 bytes); heap 238 KB.
-- `app/` now has chipsynth applied (copied engine + patch), uncommitted.
+- `app/` now has chipsynth applied (copied engine + patch); committed as e7d147a on branch `chipsynth`.
+
+## Bank reorder: chip voices first (2026-11-02)
+- Slots 0-10 are 11 new DX7 patches imitating the chipsynth presets (CHIP LEAD, CHIP PWM, CHIP TRI, CHIP PLUCK, CHIP CHORD, CHIP ZAP, CHIP COIN, GB WAVBASS, NOISE HAT, NOISE SNR, METALNOISE), defined in `tools/Generate-Factory-DX7.mjs`. Slots 11-42 are the 32 kept V15 voices; 43-127 repeat 0-42. This moves program numbers, so saved projects load different DX7 voices than on stock firmware.
+- They are FM approximations (2:1 modulator = square, feedback = noise, pitch EG for zap/coin; one pitch-EG step = 1/32 octave). Single-tone voices stack three identical pairs to match V15 loudness.
+- Checked by rendering through `web/synth` on the Mac: peaks 0.30-0.36 vs PIANO 1 0.29, pitches on note, noise voices 4.8-9.6k zero crossings/s. Rendered audio in `build/dx7-chip-voices.wav`. All 128 voices pass `FM1Web.validateVoice`. Not yet heard by a person.
+- Firmware: 450,884 bytes, 3,037 free. Bank encodes to 3,754 bytes. `.inc` SPDX is now `Apache-2.0 AND GPL-3.0-only WITH GPL-3.0-linking-exception`.
 
 ## Constraints learned (don't relearn the hard way)
 - Audio code must be Flash-write safe: tag code `FM1_AUDIO_CODE`, initialized/const tables `FM1_AUDIO_DATA`, and avoid libc/libm and anything that may pull `libcompiler_rt` from Flash. That is why the audio path has no float, no 64-bit math and no variable division (macros step with incremental counters). 64-bit math exists only in init (`build_tables`).
