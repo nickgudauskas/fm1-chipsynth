@@ -126,13 +126,15 @@ enum { OVERVIEW, STEPS, FM_EDIT, FM_ENV, FM_LFO, TONE_EDIT, MIX, BLE, PROJECT, N
 enum { OCT_DOWN, OCT_UP, FX, SCL, ENV, LFO, EDIT, GLO, HOME, SAVE, ARP, SEQ, PLAY, REC };
 #define BUTTON(b) (1U << (b))
 /* Track colours and the accent slowly colour-cycle: each fades into its
- * neighbour's in 8 steps, one step every 250 ms (a full turn in 16 s). Text,
+ * neighbour's in 8 steps. HOME+K4 picks the speed: off, or one step every
+ * 1000/500/250/125/62 ms (level 3, a full turn in 16 s, is the default). Text,
  * dim labels and the background stay fixed so everything stays readable. */
 static const uint16_t base_colors[8] = {0x3c9f, 0x07bf, 0x4eae, 0x06d4, 0xac9f, 0xed18, 0xff06, 0xfba5};
 static uint16_t colors[8] = {0x3c9f, 0x07bf, 0x4eae, 0x06d4, 0xac9f, 0xed18, 0xff06, 0xfba5};
 static uint16_t accent = 0x07bf;
 #define ACCENT accent
-static unsigned palette_phase;
+static unsigned palette_phase, cycle_speed = 3;
+static uint32_t palette_at;
 static uint16_t blend565(uint16_t a, uint16_t b, int t)  /* t in 0..8 */
 {
     int r = (a >> 11) + ((((b >> 11) - (a >> 11)) * t) >> 3);
@@ -142,7 +144,10 @@ static uint16_t blend565(uint16_t a, uint16_t b, int t)  /* t in 0..8 */
 }
 static int palette_step(uint32_t now)  /* returns 1 when the colours moved */
 {
-    unsigned phase = (now / 250U) & 63U;
+    static const uint16_t period[6] = {0, 1000, 500, 250, 125, 62};
+    unsigned phase = palette_phase;
+    if (!cycle_speed) phase = 0;                       /* off: standard colours */
+    else if (now - palette_at >= period[cycle_speed]) { palette_at = now; phase = (phase + 1U) & 63U; }
     if (phase == palette_phase) return 0;
     palette_phase = phase;
     for (unsigned i = 0; i < 8; ++i)
@@ -1950,6 +1955,14 @@ static int apply_controls(const struct fm1_controls *controls, uint32_t now,
     if ((controls->buttons & (BUTTON(HOME) | BUTTON(GLO))) == (BUTTON(HOME) | BUTTON(GLO)) &&
         (pressed & (BUTTON(HOME) | BUTTON(GLO)))) {
         page = BLE; glo_down = glo_used = ble_view = ble_forget = ble_action = 0; ble_result = 0;
+        goto controls_done;
+    }
+    /* HOME+K4: colour-cycle speed, off and levels 1 (slow) to 5 (fast). */
+    if ((controls->buttons & BUTTON(HOME)) && controls->encoders[5]) {
+        static const char *const speed_names[6] = {"COLORS OFF", "COLORS 1", "COLORS 2", "COLORS 3", "COLORS 4", "COLORS 5"};
+        cycle_speed = (unsigned)clamp((int)cycle_speed + controls->encoders[5], 0, 5);
+        notice = speed_names[cycle_speed];
+        notice_until = now + 1500U;
         goto controls_done;
     }
     /* Keep the original HOME+PRESETS shortcut, including after HOME opens

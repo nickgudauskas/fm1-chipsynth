@@ -72,7 +72,9 @@ The device's DSP engine and sequencer are the sealed binary `sdk/lib/libfm1_engi
 
 ## Screen colour cycling (2026-11-02)
 - `app/screen.c`: the 8 track colours (`colors[]`, now RAM, from `base_colors[]`) and the accent (`ACCENT` is now the variable `accent`, following track colour 2) palette-rotate: each colour fades into its neighbour's in 8 steps, one step per 250 ms, a full turn in 16 s. `palette_step()` runs in `draw()`; when it moves, `saved_cache.shown_page = ~0U` forces a repaint (banded, off-screen, so no flicker). Text, DIM, GREEN, AMBER and BACK are fixed.
-- Checked in the browser simulator (colours rotate). Not checked on hardware: a full repaint 4 times a second; knob/key feedback has paint priority, but watch responsiveness and control-task load. Cost 128 bytes: firmware 453,404 bytes, **517 free**.
+- Checked in the browser simulator (colours rotate). Not checked on hardware: a full repaint 4 times a second at the default speed; knob/key feedback has paint priority, but watch responsiveness and control-task load.
+- Speed: hold HOME and turn K4 (`encoders[5]`): COLORS OFF (standard colours, no repaints) or 1-5 (a step every 1000/500/250/125/62 ms; 3 = default). The hint line shows the level for 1.5 s. Not saved: it resets to 3 at power-on. Pressing HOME still changes page on press, as with HOME+PRESETS. Simulator test (whole-screen fingerprints): changes at default and level 5, frozen at OFF.
+- Cost 416 bytes in all (128 + 288 for the speed control): firmware 453,692 bytes, **229 free**.
 
 ## Constraints learned (don't relearn the hard way)
 - Audio code must be Flash-write safe: tag code `FM1_AUDIO_CODE`, initialized/const tables `FM1_AUDIO_DATA`, and avoid libc/libm and anything that may pull `libcompiler_rt` from Flash. That is why the audio path has no float, no 64-bit math and no variable division (macros step with incremental counters). 64-bit math exists only in init (`build_tables`).
