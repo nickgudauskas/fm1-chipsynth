@@ -28,3 +28,10 @@ id_ed25519
 /INTERNAL_PROVENANCE.md
 /fm1-open-publish.md
 /.codex-sinco/
+
+# Local files
+.DS_Store
+/.claude/
+/chipsynth/host/demo.wav
+/chipsynth/host/test_host
+/chipsynth/host/demo_host
